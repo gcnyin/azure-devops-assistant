@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Azure DevOps Sprint Board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        /* Injected globals for the application */
+        window.INCOMPLETE_STATES_RAW = {{ incomplete_states|safe }};
+        window.STATE_COLORS = {{ state_colors|safe }};
+        window.TYPE_ICONS = {{ type_icons|safe }};
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <h1 id="projectName">Azure DevOps</h1>
+                <span class="sprint-name" id="sprintName">-</span>
+                <span class="meta-info">
+                    <span id="sprintDates"></span>
+                    <span class="sep">|</span>
+                    <span id="assignedTo">-</span>
+                    <span class="sep">|</span>
+                    <span id="teamName">-</span>
+                </span>
+                <span class="update-time">Updated: <span id="updateTime">-</span></span>
+                <span class="offline-badge" id="offlineBadge" style="display:none;">Offline</span>
+            </div>
+            <button class="btn-refresh" onclick="refresh()">Refresh</button>
+        </header>
+
+        <nav class="nav-bar">
+            <button class="btn-tab active" id="tabBoard" onclick="switchTab('board')">Board</button>
+            <button class="btn-tab" id="tabFixes" onclick="switchTab('fixes')">AI Fixes</button>
+            <button class="btn-tab" id="tabHistory" onclick="switchTab('history')">History</button>
+        </nav>
+
+        <div class="stats" id="statsRow">
+            <div class="stat total"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total</div></div>
+            <div class="stat open"><div class="stat-value" id="statOpen">-</div><div class="stat-label">Open</div></div>
+            <div class="stat done"><div class="stat-value" id="statDone">-</div><div class="stat-label">Done</div></div>
+        </div>
+
+        <div class="table-wrap" id="boardPanel">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:42px">#</th>
+                        <th style="width:56px">ID</th>
+                        <th>Title <span class="kbd-hint">click for detail</span></th>
+                        <th style="width:72px">Type</th>
+                        <th style="width:110px">State</th>
+                        <th style="width:96px">Owner</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsBody">
+                    <tr><td colspan="6"><div class="loading-state">Loading...</div></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-wrap" id="fixesPanel" style="display:none;">
+            <div id="fixesContent"><div class="loading-state">Loading...</div></div>
+        </div>
+
+        <div class="table-wrap" id="historyPanel" style="display:none;">
+            <div id="historyContent"><div class="loading-state">Loading...</div></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay" style="display:none;" onclick="closeModal(event)">
+        <div class="modal" id="modalBox" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()" aria-label="Close">x</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        function getStateColor(state) {
+            return (window.STATE_COLORS || {})[state.toLowerCase()] || '#9ca3af';
+        }
+        function getTypeIcon(type) {
+            return (window.TYPE_ICONS || {})[type.toLowerCase()] || '\uD83D\uDCCC';
+        }
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
