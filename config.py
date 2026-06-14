@@ -26,6 +26,13 @@ class Config:
     # AI 修复建议用的工作目录
     WORK_DIR: str = os.getenv("WORK_DIR", "")
 
+    # ── 通知配置 ──
+    NOTIFY_DESKTOP: bool = os.getenv("NOTIFY_DESKTOP", "").lower() in ("true", "1", "yes")
+    NOTIFY_WEBHOOK_URL: str = os.getenv("NOTIFY_WEBHOOK_URL", "")
+
+    # ── 日志目录 ──
+    LOG_DIR: str = os.getenv("LOG_DIR", "")
+
     @classmethod
     def validate(cls) -> bool:
         missing = []
@@ -45,7 +52,8 @@ class Config:
         return f"https://dev.azure.com/{cls.ORG}"
 
     @classmethod
-    def team_url(cls) -> str:
-        """返回团队级别 API URL"""
-        team = cls.TEAM or cls.PROJECT  # 如果没指定 team，用 project 名作为默认 team
-        return f"https://dev.azure.com/{cls.ORG}/{cls.PROJECT}/{team}"
+    def profile_base_url(cls) -> str:
+        """返回 Azure DevOps Profile API 基础 URL"""
+        return f"https://vssps.dev.azure.com/{cls.ORG}"
+
+

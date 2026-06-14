@@ -34,3 +34,7 @@ sprint_report.*
 my_sprint.*
 sprint_history.db
 *.db
+
+# Logs
+logs/
+.playwright-cli

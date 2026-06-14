@@ -3,10 +3,14 @@ Azure DevOps REST API 客户端
 """
 import base64
 import re
+import time
 import requests
 from typing import Any
 
 from config import Config
+from utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def _strip_html(html: str) -> str:
@@ -28,6 +32,10 @@ def _strip_html(html: str) -> str:
 class AzureDevOpsClient:
     """封装 Azure DevOps REST API 调用"""
 
+    _RETRIES = 3
+
+    _TIMEOUT = 30  # 秒
+
     def __init__(self, config: type[Config] = Config):
         self.config = config
         self._session = requests.Session()
@@ -39,6 +47,50 @@ class AzureDevOpsClient:
         })
         # 自动发现正确的 Team 名称
         self._team: str = self._resolve_team()
+
+    # ------------------------------------------------------------------
+    # HTTP 重试
+    # ------------------------------------------------------------------
+
+    def _request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """带指数退避的 HTTP 请求，自动重试 429 / 5xx / 网络异常
+
+        行为：
+        - 4xx（除 429）不重试，直接返回
+        - 5xx / 429 / 网络异常：指数退避重试，最多 _RETRIES 次
+        - 所有重试耗尽后，若为网络异常则抛出；若为 HTTP 错误则返回响应（由调用方处理）
+        """
+        kwargs.setdefault("timeout", self._TIMEOUT)
+        last_status = None
+        last_exception: Exception | None = None
+        for attempt in range(self._RETRIES):
+            try:
+                resp = self._session.request(method, url, **kwargs)
+                # 4xx（除 429）不重试
+                if resp.status_code < 500 and resp.status_code != 429:
+                    return resp
+                last_status = resp.status_code
+                logger.warning(
+                    "HTTP %d on %s %s (attempt %d/%d)",
+                    resp.status_code, method, url, attempt + 1, self._RETRIES,
+                )
+                if attempt < self._RETRIES - 1:
+                    wait = 2 ** attempt
+                    time.sleep(wait)
+            except requests.RequestException as e:
+                last_exception = e
+                logger.warning(
+                    "请求异常 %s %s (attempt %d/%d): %s",
+                    method, url, attempt + 1, self._RETRIES, e,
+                )
+                if attempt < self._RETRIES - 1:
+                    time.sleep(2 ** attempt)
+
+        if last_exception is not None:
+            raise last_exception
+        # 所有重试耗尽，返回最后一次 HTTP 响应（可能是 429 或 5xx）
+        logger.error("所有重试 (%d) 耗尽: %s %s", self._RETRIES, method, url)
+        return resp
 
     # ------------------------------------------------------------------
     # Team 自动发现
@@ -59,7 +111,7 @@ class AzureDevOpsClient:
         # 获取项目下所有 Team
         url = f"{self.config.base_url()}/_apis/projects/{self.config.PROJECT}/teams"
         try:
-            resp = self._session.get(url, params={"api-version": "7.1"})
+            resp = self._request("GET", url, params={"api-version": "7.1"})
             if resp.status_code != 200:
                 return self.config.PROJECT
             teams = resp.json().get("value", [])
@@ -79,8 +131,8 @@ class AzureDevOpsClient:
                     f"{self.config.base_url()}/{self.config.PROJECT}/{team_name}"
                     f"/_apis/work/teamsettings/iterations"
                 )
-                r = self._session.get(
-                    iter_url,
+                r = self._request(
+                    "GET", iter_url,
                     params={"$timeframe": "current", "api-version": "7.1"},
                 )
                 if r.status_code == 200:
@@ -118,15 +170,37 @@ class AzureDevOpsClient:
     # ------------------------------------------------------------------
 
     def get_my_display_name(self) -> str | None:
-        """通过 PAT 获取当前用户的 displayName"""
-        url = f"{self.config.base_url()}/_apis/connectionData"
+        """通过 PAT 获取当前用户的 displayName。
+
+        优先使用官方 Profile API，失败时回退到 connectionData。
+        """
+        # 方案 1: 官方 Profile API（需要 PAT 有 User Profile (Read) 权限）
         try:
-            resp = self._session.get(url)  # 不带 api-version
+            url = f"{self.config.profile_base_url()}/_apis/profile/profiles/me"
+            resp = self._request("GET", url, params={"api-version": "7.1"})
+            if resp.status_code == 200:
+                data = resp.json()
+                display_name = data.get("displayName")
+                if display_name:
+                    logger.info("通过 Profile API 获取用户: %s", display_name)
+                    return display_name
+        except Exception:
+            logger.debug("Profile API 获取用户失败，回退到 connectionData")
+
+        # 方案 2: connectionData（常用但未公开文档）
+        try:
+            url = f"{self.config.base_url()}/_apis/connectionData"
+            resp = self._request("GET", url)  # 不带 api-version
             if resp.status_code == 200:
                 user = resp.json().get("authenticatedUser", {})
-                return user.get("providerDisplayName")
+                display_name = user.get("providerDisplayName")
+                if display_name:
+                    logger.info("通过 connectionData 获取用户: %s", display_name)
+                    return display_name
         except Exception:
-            pass
+            logger.debug("connectionData 获取用户也失败")
+
+        logger.warning("无法获取用户 displayName")
         return None
 
     # ------------------------------------------------------------------
@@ -141,7 +215,7 @@ class AzureDevOpsClient:
         url = f"{self.team_api_url()}/_apis/work/teamsettings/iterations"
         # 不用 $timeframe=current（Azure DevOps 在无匹配时会回退到最近一个过去的 Sprint）
         # 拉全部迭代，自己过滤
-        resp = self._session.get(url, params={"api-version": "7.1"})
+        resp = self._request("GET", url, params={"api-version": "7.1"})
         resp.raise_for_status()
         data = resp.json()
         iterations = data.get("value", [])
@@ -208,8 +282,8 @@ class AzureDevOpsClient:
         )
 
         url = f"{self.config.base_url()}/{self.config.PROJECT}/_apis/wit/wiql"
-        resp = self._session.post(
-            url,
+        resp = self._request(
+            "POST", url,
             json={"query": wiql},
             params={"api-version": "7.1"},
         )
@@ -263,8 +337,8 @@ class AzureDevOpsClient:
             batch = ids[i:i + 200]
             ids_str = ",".join(str(x) for x in batch)
             url = f"{self.config.base_url()}/{self.config.PROJECT}/_apis/wit/workitems"
-            resp = self._session.get(
-                url,
+            resp = self._request(
+                "GET", url,
                 params={
                     "ids": ids_str,
                     "fields": "System.Title,System.State,System.WorkItemType,System.AssignedTo,System.CreatedDate,System.Description,Microsoft.VSTS.TCM.ReproSteps,Custom.Context",
