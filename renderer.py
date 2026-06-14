@@ -43,17 +43,18 @@ _TYPE_ICONS: dict[str, str] = {
 
 # ── 导出用字符串版本（web.py 使用） ──
 STATE_COLORS_HEX: dict[str, str] = {
-    "done": "#22c55e",
-    "closed": "#22c55e",
-    "completed": "#22c55e",
-    "resolved": "#16a34a",
-    "in progress": "#eab308",
-    "active": "#eab308",
-    "committed": "#ca8a04",
-    "to do": "#06b6d4",
-    "new": "#22d3ee",
-    "removed": "#ef4444",
-    "blocked": "#dc2626",
+    # Raycast accent 色系 — 仅在状态标签和扩展插图使用
+    "done": "#59d499",       # accent-green
+    "closed": "#59d499",
+    "completed": "#59d499",
+    "resolved": "#3aad7f",
+    "in progress": "#ffc533",  # accent-yellow
+    "active": "#ffc533",
+    "committed": "#e5a81c",
+    "to do": "#57c1ff",       # accent-blue
+    "new": "#57c1ff",
+    "removed": "#ff6161",     # accent-red
+    "blocked": "#ff6161",
 }
 
 
