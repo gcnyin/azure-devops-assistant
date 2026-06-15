@@ -1,4 +1,5 @@
 import { useSearchParams, Outlet, useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { useBoardData, useConfig } from "@/hooks/useApi";
@@ -6,6 +7,7 @@ import { useBoardData, useConfig } from "@/hooks/useApi";
 export function AppLayout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const view = searchParams.get("view") || "all";
   const pathname = window.location.pathname;
   const { data: boardData, isError } = useBoardData(view);
@@ -30,7 +32,11 @@ export function AppLayout() {
       <Header
         data={boardData}
         isError={isError}
-        onRefresh={() => window.location.reload()}
+        onRefresh={() => {
+          queryClient.invalidateQueries({ queryKey: ["board"] });
+          queryClient.invalidateQueries({ queryKey: ["fixes"] });
+          queryClient.invalidateQueries({ queryKey: ["history"] });
+        }}
         onExport={handleExport}
       />
 
