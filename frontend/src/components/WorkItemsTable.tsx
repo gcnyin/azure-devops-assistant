@@ -4,7 +4,6 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { getStateColor } from "@/lib/state-color";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
@@ -18,54 +17,92 @@ interface WorkItemsTableProps {
   diffType?: DiffFilterType;
   stateColors: Record<string, string>;
   showFixColumn?: boolean;
-  selectedBugIds?: Set<number>;
-  onBugToggle?: (bugId: number) => void;
-  onFixDotClick?: (e: React.MouseEvent, bugId: number) => void;
+  onTriggerFix?: (bugId: number) => void;
+  onViewFix?: (bugId: number) => void;
 }
 
-function FixDot({ status }: { status?: string | null }) {
-  if (!status) return <span className="inline-block w-2 h-2 rounded-full bg-ink-soft/20 flex-shrink-0" />;
-  const map: Record<string, string> = {
-    pending: "bg-ink-soft/40",
-    running: "bg-accent-amber animate-pulse",
-    completed: "bg-success",
-    failed: "bg-error",
-  };
-  const color = map[status] || "bg-ink-soft/20";
-  return <span className={`inline-block w-2 h-2 rounded-full ${color} flex-shrink-0`}
-    title={`Fix: ${status}`} />;
+function FixCell({ item, onTriggerFix, onViewFix }: {
+  item: WorkItem;
+  onTriggerFix?: (bugId: number) => void;
+  onViewFix?: (bugId: number) => void;
+}) {
+  const isBug = (item.type || "").toLowerCase() === "bug";
+  if (!isBug) return null;
+
+  const status = item._fix_status;
+
+  if (!status) {
+    return (
+      <button
+        className="text-primary text-[13px] hover:underline cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
+      >
+        Fix
+      </button>
+    );
+  }
+
+  if (status === "pending") {
+    return <span className="text-ink-soft/60 text-[13px]">Queued...</span>;
+  }
+
+  if (status === "running") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px]">
+        <span className="inline-block w-2 h-2 rounded-full bg-accent-amber animate-pulse flex-shrink-0" />
+        <span className="text-ink-soft">Running...</span>
+      </span>
+    );
+  }
+
+  if (status === "completed") {
+    // We don't have agent_name/duration on WorkItem, so show minimal info
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px]">
+        <span className="inline-block w-2 h-2 rounded-full bg-success flex-shrink-0" />
+        <span className="text-ink-soft">Done</span>
+        <button
+          className="text-primary hover:underline cursor-pointer ml-1"
+          onClick={(e) => { e.stopPropagation(); onViewFix?.(item.id); }}
+        >
+          View
+        </button>
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px]">
+        <span className="inline-block w-2 h-2 rounded-full bg-error flex-shrink-0" />
+        <span className="text-ink-soft">Failed</span>
+        <button
+          className="text-primary hover:underline cursor-pointer ml-1"
+          onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
+        >
+          Retry
+        </button>
+      </span>
+    );
+  }
+
+  return null;
 }
 
 export function WorkItemsTable({
   items, rowType, onRowClick, showDiffColumn, diffType, stateColors,
-  showFixColumn, selectedBugIds, onBugToggle, onFixDotClick,
+  showFixColumn, onTriggerFix, onViewFix,
 }: WorkItemsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns: ColumnDef<RowType>[] = [];
 
-  // 修复状态列（圆点 + checkbox）
   if (showFixColumn) {
     columns.push({
-      id: "fix", header: "", size: 44, enableSorting: false,
-      cell: ({ row: tr }) => {
-        const it = tr.original;
-        const isBug = (it.type || "").toLowerCase() === "bug";
-        if (!isBug) return <span className="w-8" />;
-        const isSelected = selectedBugIds?.has(it.id) ?? false;
-        return (
-          <span className="inline-flex items-center gap-2">
-            <span onClick={(e) => onFixDotClick?.(e, it.id)}>
-              <FixDot status={it._fix_status} />
-            </span>
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={() => onBugToggle?.(it.id)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </span>
-        );
-      },
+      id: "fix", header: "AI Fix", size: 110, enableSorting: false,
+      cell: ({ row: tr }) => (
+        <FixCell item={tr.original} onTriggerFix={onTriggerFix} onViewFix={onViewFix} />
+      ),
     });
   }
 

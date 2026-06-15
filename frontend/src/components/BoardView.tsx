@@ -32,7 +32,6 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
 
   const fixesMutation = useFixesMutation();
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
-  const [selectedBugIds, setSelectedBugIds] = useState<Set<number>>(new Set());
   const [searchText, setSearchText] = useState(searchQuery);
 
   const allItems = data?.items || [];
@@ -71,31 +70,18 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
     });
   };
 
-  const toggleBugSelection = (bugId: number) => {
-    setSelectedBugIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(bugId)) next.delete(bugId); else next.add(bugId);
-      return next;
-    });
-  };
-
-  const handleDotClick = (e: React.MouseEvent, bugId: number) => {
-    e.stopPropagation();
-    navigate(`/fixes?bug_id=${bugId}`);
-  };
-
-  const handleGenerateFixes = () => {
-    if (selectedBugIds.size === 0 || fixesMutation.isPending) return;
-    fixesMutation.mutate(Array.from(selectedBugIds), {
+  const handleTriggerFix = (bugId: number) => {
+    fixesMutation.mutate([bugId], {
       onSuccess: (result) => {
-        if (result.ok) {
-          toast.success(result.message || "Fix tasks queued");
-        } else {
-          toast.error(result.error || "Failed to queue fix tasks");
-        }
+        if (result.ok) toast.success(result.message || "Fix task queued");
+        else toast.error(result.error || "Failed to queue fix task");
       },
-      onError: () => toast.error("Failed to queue fix tasks"),
+      onError: () => toast.error("Failed to queue fix task"),
     });
+  };
+
+  const handleViewFix = (bugId: number) => {
+    navigate(`/fixes?bug_id=${bugId}`);
   };
 
   const nn = diff?.new_items?.length || 0;
@@ -162,13 +148,6 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
           {ng > 0 && <Badge variant="outline"
             className={`diff-tag gone cursor-pointer hover:brightness-110 select-none ${diffFilter === "gone" ? "outline-2 outline-offset-1 outline-error" : ""}`}
             onClick={() => updateParam("diff", diffFilter === "gone" ? "" : "gone")}>-{ng} Gone</Badge>}
-          <Button variant="secondary" size="sm"
-            onClick={handleGenerateFixes}
-            disabled={selectedBugIds.size === 0 || fixesMutation.isPending}>
-            {fixesMutation.isPending
-              ? "Queuing..."
-              : `Generate AI Fixes${selectedBugIds.size > 0 ? ` (${selectedBugIds.size})` : ""}`}
-          </Button>
         </div>
       </div>
 
@@ -191,9 +170,8 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
             onRowClick={setSelectedItem}
             stateColors={stateColors}
             showFixColumn
-            selectedBugIds={selectedBugIds}
-            onBugToggle={toggleBugSelection}
-            onFixDotClick={handleDotClick}
+            onTriggerFix={handleTriggerFix}
+            onViewFix={handleViewFix}
           />
         )}
       </div>
