@@ -47,6 +47,9 @@ _work_dir: str = "."
 # ── Web access token (set by main.py at startup) ──
 _access_token: str = ""
 
+# ── Manual refresh callback (set by main.py at startup) ──
+_refresh_callback = None
+
 
 def set_web_work_dir(work_dir: str):
     global _work_dir
@@ -62,6 +65,11 @@ def set_web_query_states(states: list[str]):
 def set_web_access_token(token: str):
     global _access_token
     _access_token = token or ""
+
+
+def set_refresh_callback(cb):
+    global _refresh_callback
+    _refresh_callback = cb
 
 
 # ── Flask App ──
@@ -126,6 +134,19 @@ def health():
         "last_update": data["last_update"],
         "offline": data["offline"],
     })
+
+
+@app.route("/api/refresh", methods=["POST"])
+def api_refresh():
+    """手动触发一次数据拉取，完成后更新缓存。"""
+    if not _refresh_callback:
+        return jsonify({"ok": False, "error": "Refresh not available (callback not registered)"}), 503
+    try:
+        _refresh_callback()
+        return jsonify({"ok": True, "message": "Data refreshed"})
+    except Exception as e:
+        logger.error("Manual refresh failed: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/config")

@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from web import app, update_cached_data, get_cached_data, set_web_query_states, set_web_access_token
+from web import app, update_cached_data, get_cached_data, set_web_query_states, set_web_access_token, set_refresh_callback
 
 
 @pytest.fixture
@@ -641,6 +641,86 @@ class TestApiFixesCancelRoute:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
+        set_web_access_token("")
+
+
+class TestApiRefreshRoute:
+    """POST /api/refresh 路由测试"""
+
+    def test_no_callback_returns_503(self, client):
+        """未注册刷新回调时返回 503"""
+        set_refresh_callback(None)
+        resp = client.post("/api/refresh")
+        assert resp.status_code == 503
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "error" in data
+
+    def test_callback_invoked_and_returns_success(self, client):
+        """注册回调后被调用并返回成功"""
+        called = []
+        def _cb():
+            called.append(True)
+        set_refresh_callback(_cb)
+
+        resp = client.post("/api/refresh")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert "message" in data
+        assert len(called) == 1
+
+    def test_callback_exception_returns_500(self, client):
+        """回调抛出异常返回 500"""
+        def _cb():
+            raise RuntimeError("refresh failed")
+        set_refresh_callback(_cb)
+
+        resp = client.post("/api/refresh")
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "refresh failed" in data["error"]
+
+    def test_callback_updates_cache(self, client):
+        """回调更新缓存后 /api/data 反映最新数据"""
+        def _cb():
+            update_cached_data(
+                iteration={"name": "Refreshed Sprint"},
+                items=[{"id": 99, "title": "Refreshed Item", "state": "To Do", "type": "Bug", "assignedTo": "T"}],
+                diff_info=None,
+                team_name="T",
+                project="P",
+            )
+        set_refresh_callback(_cb)
+
+        # 先确认当前缓存为空
+        resp_before = client.get("/api/data")
+        assert resp_before.get_json()["items"] == []
+
+        # 触发刷新
+        resp_refresh = client.post("/api/refresh")
+        assert resp_refresh.status_code == 200
+
+        # 验证缓存已更新
+        resp_after = client.get("/api/data")
+        data = resp_after.get_json()
+        assert data["iteration"]["name"] == "Refreshed Sprint"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == 99
+
+    def test_refresh_with_access_token_auth(self, client):
+        """配置 token 时 /api/refresh 也需要认证"""
+        set_refresh_callback(lambda: None)
+        set_web_access_token("secret123")
+        resp = client.post("/api/refresh")
+        assert resp.status_code == 401
+
+        resp = client.post(
+            "/api/refresh",
+            headers={"Authorization": "Bearer secret123"},
+        )
+        assert resp.status_code == 200
         set_web_access_token("")
 
 

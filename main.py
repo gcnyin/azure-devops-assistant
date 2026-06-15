@@ -325,11 +325,12 @@ def main():
     # ── Web UI ──
 
     # 设置 Web 配置
-    from web import set_web_query_states, set_web_work_dir, set_web_access_token
+    from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback
     from ai_fix import set_timeout as ai_set_timeout
     set_web_query_states(config.QUERY_STATES)
     set_web_work_dir(config.WORK_DIR)
     set_web_access_token(config.WEB_ACCESS_TOKEN)
+    set_refresh_callback(check_and_cache)
     ai_set_timeout(config.AI_FIX_TIMEOUT_SECONDS)
 
     # 确定监听地址

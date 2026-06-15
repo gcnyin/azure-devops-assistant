@@ -34,6 +34,18 @@ export function useBoardData(view: string) {
   });
 }
 
+export function useRefreshMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      fetch("/api/refresh", { method: "POST" }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
+}
+
 export function useFixes(status?: string, bugId?: number) {
   const params = new URLSearchParams();
   if (status) params.set("status", status);

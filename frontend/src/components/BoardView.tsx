@@ -8,7 +8,7 @@ import { WorkItemsTable } from "@/components/WorkItemsTable";
 import { DetailModal } from "@/components/DetailModal";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatsRow } from "@/components/StatsRow";
-import { useFixesMutation } from "@/hooks/useApi";
+import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
 import type { BoardData, WorkItem, DiffFilterType } from "@/types/api";
 
@@ -31,6 +31,7 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
       ? diffFilterParam : null;
 
   const fixesMutation = useFixesMutation();
+  const refreshMutation = useRefreshMutation();
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [searchText, setSearchText] = useState(searchQuery);
 
@@ -93,6 +94,16 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
   let bugCount = 0;
   for (const it of allItems) { if ((it.type || "").toLowerCase() === "bug") bugCount++; }
 
+  const handleRefresh = () => {
+    refreshMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.ok) toast.success(result.message || "Data refreshed");
+        else toast.error(result.error || "Refresh failed");
+      },
+      onError: () => toast.error("Refresh request failed"),
+    });
+  };
+
   return (
     <div>
       {data?.error && <ErrorBanner message={data.error} />}
@@ -103,6 +114,16 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
           onClick={() => setView("all")}>All</Button>
         <Button variant={view === "me" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
           onClick={() => setView("me")}>Me</Button>
+        <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-lg"
+          disabled={refreshMutation.isPending}
+          onClick={handleRefresh}
+        >
+          {refreshMutation.isPending ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
 
       <div className="flex items-center gap-3 mb-6 flex-wrap max-md:flex-col max-md:items-stretch max-md:gap-2">
