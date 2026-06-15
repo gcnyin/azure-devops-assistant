@@ -15,10 +15,10 @@ export function Header({ data, isError, onRefresh, onExport }: HeaderProps) {
         <h1 className="text-lg font-medium text-ink whitespace-nowrap">
           {data?.project || "Azure DevOps"}
         </h1>
-        <span className="text-sm font-medium text-ink bg-canvas-soft px-3 py-1 rounded-md">
+        <span className="text-sm font-medium text-ink bg-canvas-card px-3 py-1 rounded-lg">
           {data?.iteration?.name || "-"}
         </span>
-        <span className="flex items-center gap-3 text-sm text-ink-mute flex-wrap">
+        <span className="flex items-center gap-3 text-sm text-ink-muted flex-wrap">
           <span>
             {data?.iteration
               ? `${(data.iteration.startDate || "").slice(0, 10)} - ${(data.iteration.finishDate || "").slice(0, 10)}`
@@ -29,22 +29,16 @@ export function Header({ data, isError, onRefresh, onExport }: HeaderProps) {
           <span className="text-hairline select-none">|</span>
           <span>{data?.team_name || "-"}</span>
         </span>
-        <span className="text-[13px] text-ink-mute">
-          Updated {data?.last_update || "-"}
-        </span>
+        <span className="text-[13px] text-ink-muted">Updated {data?.last_update || "-"}</span>
         {data?.offline && (
-          <span className="inline-flex items-center gap-1 bg-accent-tomato/15 text-accent-tomato px-2 py-0.5 rounded text-xs font-semibold">
+          <span className="inline-flex items-center gap-1 bg-error/10 text-error px-2 py-0.5 rounded text-xs font-semibold">
             Offline
           </span>
         )}
       </div>
       <div className="flex items-center gap-2 max-sm:*:flex-1">
-        <Button variant="secondary" onClick={onExport}>
-          Export
-        </Button>
-        <Button variant="default" onClick={onRefresh} disabled={isError}>
-          Refresh
-        </Button>
+        <Button variant="secondary" onClick={onExport}>Export</Button>
+        <Button variant="default" onClick={onRefresh} disabled={isError}>Refresh</Button>
       </div>
     </header>
   );

@@ -1,15 +1,9 @@
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
+  useReactTable, getCoreRowModel, getSortedRowModel, flexRender,
+  type ColumnDef, type SortingState,
 } from "@tanstack/react-table";
 import { useState } from "react";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getStateColor } from "@/lib/state-color";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
@@ -24,89 +18,55 @@ interface WorkItemsTableProps {
   stateColors: Record<string, string>;
 }
 
-export function WorkItemsTable({
-  items, rowType, onRowClick, showDiffColumn, diffType, stateColors,
-}: WorkItemsTableProps) {
+export function WorkItemsTable({ items, rowType, onRowClick, showDiffColumn, diffType, stateColors }: WorkItemsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns: ColumnDef<RowType>[] = [
-    {
-      id: "index", header: "#", size: 42,
-      cell: ({ row }) => <span className="text-ink-faint">{row.index + 1}</span>,
-      enableSorting: false,
-    },
-    {
-      id: "id", header: "ID", size: 56,
-      accessorFn: (row) => row.id,
-      cell: ({ getValue }) => (
-        <span className="text-ink font-medium tabular-nums">{String(getValue())}</span>
-      ),
-    },
-    {
-      id: "title", header: "Title",
-      accessorFn: (row) => row.title,
-      cell: ({ row: tableRow }) => {
-        const item = tableRow.original;
-        let prefix = "", titleClass = "";
-        if (rowType === "new") { prefix = "+ "; titleClass = "text-primary-deep font-medium"; }
-        else if (rowType === "changed") { prefix = "~ "; titleClass = "text-amber-600 font-medium"; }
-        else if (rowType === "gone") { prefix = "- "; titleClass = "text-accent-tomato"; }
-        return <span className={titleClass}>{prefix}{item.title}</span>;
-      },
-    },
-    {
-      id: "type", header: "Type", size: 72,
-      accessorFn: (row) => row.type,
-      cell: ({ getValue }) => <span className="text-ink-secondary">{String(getValue())}</span>,
-    },
-    {
-      id: "state", header: "State", size: 120,
-      accessorFn: (row) => row.state,
-      cell: ({ row: tableRow }) => {
-        const item = tableRow.original;
-        const prev = item._prev_state;
+    { id: "index", header: "#", size: 42, cell: ({ row }) => <span className="text-ink-soft">{row.index + 1}</span>, enableSorting: false },
+    { id: "id", header: "ID", size: 56, accessorFn: (r) => r.id,
+      cell: ({ getValue }) => <span className="text-ink font-medium tabular-nums">{String(getValue())}</span> },
+    { id: "title", header: "Title", accessorFn: (r) => r.title,
+      cell: ({ row: tr }) => {
+        const it = tr.original; let p = "", c = "";
+        if (rowType === "new") { p = "+ "; c = "text-success font-medium"; }
+        else if (rowType === "changed") { p = "~ "; c = "text-accent-amber font-medium"; }
+        else if (rowType === "gone") { p = "- "; c = "text-error"; }
+        return <span className={c}>{p}{it.title}</span>;
+      }},
+    { id: "type", header: "Type", size: 72, accessorFn: (r) => r.type,
+      cell: ({ getValue }) => <span className="text-ink-body">{String(getValue())}</span> },
+    { id: "state", header: "State", size: 120, accessorFn: (r) => r.state,
+      cell: ({ row: tr }) => {
+        const it = tr.original; const prev = it._prev_state;
         if (rowType === "changed" && prev) {
-          const prevColor = getStateColor(prev, stateColors);
-          const curColor = getStateColor(item.state, stateColors);
-          return (
-            <span className="inline-flex items-center gap-1">
-              <span className="state-badge line-through" style={{ background: `${prevColor}24`, color: prevColor }}>{prev}</span>
-              <span className="text-ink-faint text-xs">&rarr;</span>
-              <span className="state-badge font-bold" style={{ background: `${curColor}24`, color: curColor }}>{item.state}</span>
-            </span>
-          );
+          const pc = getStateColor(prev, stateColors); const cc = getStateColor(it.state, stateColors);
+          return <span className="inline-flex items-center gap-1">
+            <span className="state-badge line-through" style={{ background: `${pc}24`, color: pc }}>{prev}</span>
+            <span className="text-ink-soft text-xs">&rarr;</span>
+            <span className="state-badge font-bold" style={{ background: `${cc}24`, color: cc }}>{it.state}</span>
+          </span>;
         }
-        const color = getStateColor(item.state, stateColors);
-        return <span className="state-badge" style={{ background: `${color}24`, color: color }}>{item.state}</span>;
-      },
-    },
-    {
-      id: "assignedTo", header: "Owner", size: 96,
-      accessorFn: (row) => row.assignedTo || "Unassigned",
-      cell: ({ getValue }) => <span className="text-ink-secondary font-medium">{String(getValue())}</span>,
-    },
+        const c = getStateColor(it.state, stateColors);
+        return <span className="state-badge" style={{ background: `${c}24`, color: c }}>{it.state}</span>;
+      }},
+    { id: "assignedTo", header: "Owner", size: 96, accessorFn: (r) => r.assignedTo || "Unassigned",
+      cell: ({ getValue }) => <span className="text-ink-body font-medium">{String(getValue())}</span> },
   ];
 
   if (showDiffColumn) {
-    columns.push({
-      id: "change", header: "Change", size: 76,
+    columns.push({ id: "change", header: "Change", size: 76,
       cell: () => {
         if (diffType === "new") return <span className="diff-tag new">New</span>;
         if (diffType === "changed") return <span className="diff-tag changed">Changed</span>;
         if (diffType === "gone") return <span className="diff-tag gone">Gone</span>;
         return null;
-      },
-      enableSorting: false,
+      }, enableSorting: false,
     });
   }
 
   const table = useReactTable({
-    data: items as RowType[],
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    data: items as RowType[], columns, state: { sorting }, onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
   });
 
   if (items.length === 0) return null;
@@ -116,13 +76,11 @@ export function WorkItemsTable({
       <TableHeader>
         {table.getHeaderGroups().map((hg) => (
           <TableRow key={hg.id} className="hover:bg-transparent cursor-default">
-            {hg.headers.map((header) => (
-              <TableHead key={header.id} style={{ width: header.getSize() }}
-                className="cursor-pointer select-none"
-                onClick={header.column.getToggleSortingHandler()}>
-                {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                {header.column.getIsSorted() === "asc" ? " \u2191"
-                  : header.column.getIsSorted() === "desc" ? " \u2193" : ""}
+            {hg.headers.map((h) => (
+              <TableHead key={h.id} style={{ width: h.getSize() }} className="cursor-pointer select-none"
+                onClick={h.column.getToggleSortingHandler()}>
+                {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                {h.column.getIsSorted() === "asc" ? " \u2191" : h.column.getIsSorted() === "desc" ? " \u2193" : ""}
               </TableHead>
             ))}
           </TableRow>
@@ -130,17 +88,12 @@ export function WorkItemsTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => {
-          let rowClass = "";
-          if (rowType === "new") rowClass = "row-new";
-          else if (rowType === "changed") rowClass = "row-changed";
-          else if (rowType === "gone") rowClass = "row-gone";
+          let rc = "";
+          if (rowType === "new") rc = "row-new"; else if (rowType === "changed") rc = "row-changed"; else if (rowType === "gone") rc = "row-gone";
           return (
-            <TableRow key={row.id} className={rowClass}
-              onClick={() => onRowClick?.(row.original)}>
+            <TableRow key={row.id} className={rc} onClick={() => onRowClick?.(row.original)}>
               {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
+                <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
               ))}
             </TableRow>
           );

@@ -1,88 +1,96 @@
 @import "tailwindcss";
 
-/* ── Supabase Design Tokens → Tailwind v4 Theme ── */
+/* ── Claude (Anthropic) Design Tokens → Tailwind v4 Theme ── */
 @theme inline {
-  --font-sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Surface */
-  --color-canvas: #ffffff;
-  --color-canvas-soft: #fafafa;
-  --color-canvas-night: #1c1c1c;
-  --color-canvas-night-soft: #202020;
+  /* Surface — cream */
+  --color-canvas: #faf9f5;
+  --color-canvas-soft: #f5f0e8;
+  --color-canvas-card: #efe9de;
+  --color-canvas-cream: #e8e0d2;
+
+  /* Surface — dark */
+  --color-surface-dark: #181715;
+  --color-surface-dark-elevated: #252320;
 
   /* Borders */
-  --color-hairline: #dfdfdf;
-  --color-hairline-strong: #c7c7c7;
+  --color-hairline: #e6dfd8;
+  --color-hairline-soft: #ebe6df;
 
   /* Text */
-  --color-ink: #171717;
-  --color-ink-secondary: #212121;
-  --color-ink-mute: #707070;
-  --color-ink-faint: #b2b2b2;
+  --color-ink: #141413;
+  --color-ink-body: #3d3d3a;
+  --color-ink-strong: #252523;
+  --color-ink-muted: #6c6a64;
+  --color-ink-soft: #8e8b82;
 
-  /* Primary */
-  --color-primary: #3ecf8e;
-  --color-primary-deep: #24b47e;
-  --color-primary-soft: #4ade80;
+  /* Primary — warm coral */
+  --color-primary: #cc785c;
+  --color-primary-active: #a9583e;
+  --color-primary-disabled: #e6dfd8;
+
+  /* On-dark text */
+  --color-on-dark: #faf9f5;
+  --color-on-dark-soft: #a09d96;
 
   /* Accent */
-  --color-accent-purple: #6b01c2;
-  --color-accent-purple-soft: #eddbf9;
-  --color-accent-violet: #644fc1;
-  --color-accent-yellow: #ffdb13;
-  --color-accent-tomato: #ff2201;
-  --color-accent-pink: #c7007e;
-  --color-accent-indigo: #054cff;
-  --color-accent-crimson: #e2005a;
+  --color-accent-teal: #5db8a6;
+  --color-accent-amber: #e8a55a;
+
+  /* Semantic */
+  --color-success: #5db872;
+  --color-warning: #d4a017;
+  --color-error: #c64545;
 
   /* Radius */
-  --radius: 0.375rem;
+  --radius: 0.5rem;
 
   /* shadcn/ui CSS Variables */
-  --color-background: #ffffff;
-  --color-foreground: #171717;
-  --color-card: #ffffff;
-  --color-card-foreground: #171717;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #171717;
-  --color-primary: #3ecf8e;
-  --color-primary-foreground: #171717;
-  --color-secondary: #fafafa;
-  --color-secondary-foreground: #171717;
-  --color-muted: #fafafa;
-  --color-muted-foreground: #707070;
-  --color-accent: #fafafa;
-  --color-accent-foreground: #171717;
-  --color-destructive: #ff2201;
+  --color-background: #faf9f5;
+  --color-foreground: #141413;
+  --color-card: #faf9f5;
+  --color-card-foreground: #141413;
+  --color-popover: #faf9f5;
+  --color-popover-foreground: #141413;
+  --color-primary: #cc785c;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #efe9de;
+  --color-secondary-foreground: #141413;
+  --color-muted: #efe9de;
+  --color-muted-foreground: #6c6a64;
+  --color-accent: #efe9de;
+  --color-accent-foreground: #141413;
+  --color-destructive: #c64545;
   --color-destructive-foreground: #ffffff;
-  --color-border: #dfdfdf;
-  --color-input: #dfdfdf;
-  --color-ring: #3ecf8e;
+  --color-border: #e6dfd8;
+  --color-input: #e6dfd8;
+  --color-ring: #cc785c;
 }
 
-/* ── shadcn/ui CSS Variables (Supabase-mapped) ── */
+/* ── shadcn/ui CSS Variables (Radix-compatible) ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --card: #ffffff;
-  --card-foreground: #171717;
-  --popover: #ffffff;
-  --popover-foreground: #171717;
-  --primary: #3ecf8e;
-  --primary-foreground: #171717;
-  --secondary: #fafafa;
-  --secondary-foreground: #171717;
-  --muted: #fafafa;
-  --muted-foreground: #707070;
-  --accent: #fafafa;
-  --accent-foreground: #171717;
-  --destructive: #ff2201;
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #faf9f5;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
+  --primary: #cc785c;
+  --primary-foreground: #ffffff;
+  --secondary: #efe9de;
+  --secondary-foreground: #141413;
+  --muted: #efe9de;
+  --muted-foreground: #6c6a64;
+  --accent: #efe9de;
+  --accent-foreground: #141413;
+  --destructive: #c64545;
   --destructive-foreground: #ffffff;
-  --border: #dfdfdf;
-  --input: #dfdfdf;
-  --ring: #3ecf8e;
-  --radius: 0.375rem;
+  --border: #e6dfd8;
+  --input: #e6dfd8;
+  --ring: #cc785c;
+  --radius: 0.5rem;
 }
 
 /* ── Base ── */
@@ -97,7 +105,7 @@
 @layer components {
   /* State badge */
   .state-badge {
-    @apply inline-block px-1 py-0.5 rounded text-xs font-medium;
+    @apply inline-block px-1.5 py-0.5 rounded text-xs font-medium;
   }
 
   /* Diff tags */
@@ -106,15 +114,15 @@
   }
 
   .diff-tag.new {
-    @apply bg-primary/15 text-primary-deep;
+    @apply bg-success/15 text-success;
   }
 
   .diff-tag.changed {
-    @apply bg-accent-yellow/15 text-amber-700;
+    @apply bg-accent-amber/15 text-accent-amber;
   }
 
   .diff-tag.gone {
-    @apply bg-accent-tomato/15 text-accent-tomato;
+    @apply bg-error/15 text-error;
   }
 
   /* Table wrap */
@@ -124,11 +132,11 @@
 
   /* Row diff markers */
   .row-new {
-    box-shadow: inset 3px 0 0 0 var(--color-primary);
+    box-shadow: inset 3px 0 0 0 var(--color-success);
   }
 
   .row-changed {
-    box-shadow: inset 3px 0 0 0 var(--color-accent-yellow);
+    box-shadow: inset 3px 0 0 0 var(--color-accent-amber);
   }
 
   .row-gone {

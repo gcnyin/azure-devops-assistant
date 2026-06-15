@@ -10,7 +10,7 @@ const Badge = ({
 }) => {
   const variantClasses = {
     default: "bg-primary text-primary-foreground",
-    secondary: "bg-canvas-soft text-ink",
+    secondary: "bg-canvas-card text-ink",
     destructive: "bg-destructive text-destructive-foreground",
     outline: "border border-hairline text-ink",
   };
