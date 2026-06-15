@@ -1,16 +1,7 @@
 {
   "name": "azure-devops-assistant",
   "version": "1.0.0",
-  "description": "定时从 Azure DevOps 获取当前 Sprint 中的 Work Items，在 Web 界面展示，支持增量对比、个人视图、AI 修复建议和通知系统。",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
-  "scripts": {
-    "build:css": "npx @tailwindcss/cli -i ./styles/app.css -o ./static/tailwind.css",
-    "watch:css": "npx @tailwindcss/cli -i ./styles/app.css -o ./static/tailwind.css --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "description": "Azure DevOps Sprint Board Monitor — Web UI with incremental diff, personal view, AI fix suggestions and notification system.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gcnyin/azure-devops-assistant.git"
@@ -22,9 +13,5 @@
   "bugs": {
     "url": "https://github.com/gcnyin/azure-devops-assistant/issues"
   },
-  "homepage": "https://github.com/gcnyin/azure-devops-assistant#readme",
-  "dependencies": {
-    "@tailwindcss/cli": "^4.3.1",
-    "tailwindcss": "^4.3.1"
-  }
+  "homepage": "https://github.com/gcnyin/azure-devops-assistant#readme"
 }

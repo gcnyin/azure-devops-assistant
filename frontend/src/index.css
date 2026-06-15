@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* ── Supabase Design Tokens → Tailwind v4 Theme ── */
+@theme inline {
+  --font-sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* Surface */
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #fafafa;
+  --color-canvas-night: #1c1c1c;
+  --color-canvas-night-soft: #202020;
+
+  /* Borders */
+  --color-hairline: #dfdfdf;
+  --color-hairline-strong: #c7c7c7;
+
+  /* Text */
+  --color-ink: #171717;
+  --color-ink-secondary: #212121;
+  --color-ink-mute: #707070;
+  --color-ink-faint: #b2b2b2;
+
+  /* Primary */
+  --color-primary: #3ecf8e;
+  --color-primary-deep: #24b47e;
+  --color-primary-soft: #4ade80;
+
+  /* Accent */
+  --color-accent-purple: #6b01c2;
+  --color-accent-purple-soft: #eddbf9;
+  --color-accent-violet: #644fc1;
+  --color-accent-yellow: #ffdb13;
+  --color-accent-tomato: #ff2201;
+  --color-accent-pink: #c7007e;
+  --color-accent-indigo: #054cff;
+  --color-accent-crimson: #e2005a;
+
+  /* Radius */
+  --radius: 0.375rem;
+
+  /* shadcn/ui CSS Variables */
+  --color-background: #ffffff;
+  --color-foreground: #171717;
+  --color-card: #ffffff;
+  --color-card-foreground: #171717;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #171717;
+  --color-primary: #3ecf8e;
+  --color-primary-foreground: #171717;
+  --color-secondary: #fafafa;
+  --color-secondary-foreground: #171717;
+  --color-muted: #fafafa;
+  --color-muted-foreground: #707070;
+  --color-accent: #fafafa;
+  --color-accent-foreground: #171717;
+  --color-destructive: #ff2201;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #dfdfdf;
+  --color-input: #dfdfdf;
+  --color-ring: #3ecf8e;
+}
+
+/* ── shadcn/ui CSS Variables (Supabase-mapped) ── */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #3ecf8e;
+  --primary-foreground: #171717;
+  --secondary: #fafafa;
+  --secondary-foreground: #171717;
+  --muted: #fafafa;
+  --muted-foreground: #707070;
+  --accent: #fafafa;
+  --accent-foreground: #171717;
+  --destructive: #ff2201;
+  --destructive-foreground: #ffffff;
+  --border: #dfdfdf;
+  --input: #dfdfdf;
+  --ring: #3ecf8e;
+  --radius: 0.375rem;
+}
+
+/* ── Base ── */
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased min-h-screen;
+    font-family: var(--font-sans);
+  }
+}
+
+/* ── Components ── */
+@layer components {
+  /* State badge */
+  .state-badge {
+    @apply inline-block px-1 py-0.5 rounded text-xs font-medium;
+  }
+
+  /* Diff tags */
+  .diff-tag {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium;
+  }
+
+  .diff-tag.new {
+    @apply bg-primary/15 text-primary-deep;
+  }
+
+  .diff-tag.changed {
+    @apply bg-accent-yellow/15 text-amber-700;
+  }
+
+  .diff-tag.gone {
+    @apply bg-accent-tomato/15 text-accent-tomato;
+  }
+
+  /* Table wrap */
+  .table-wrap {
+    @apply bg-canvas border border-hairline rounded-lg overflow-hidden;
+  }
+
+  /* Row diff markers */
+  .row-new {
+    box-shadow: inset 3px 0 0 0 var(--color-primary);
+  }
+
+  .row-changed {
+    box-shadow: inset 3px 0 0 0 var(--color-accent-yellow);
+  }
+
+  .row-gone {
+    @apply opacity-55;
+  }
+}

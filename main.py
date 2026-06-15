@@ -328,9 +328,8 @@ def main():
 
     # ── Web UI ──
 
-    # 设置 Web 访问 token（如果配置了）
-    from web import set_web_token, set_web_query_states, set_web_work_dir
-    set_web_token(config.WEB_ACCESS_TOKEN)
+    # 设置 Web 配置
+    from web import set_web_query_states, set_web_work_dir
     set_web_query_states(config.QUERY_STATES)
     set_web_work_dir(config.WORK_DIR)
 
@@ -348,15 +347,11 @@ def main():
         except Exception:
             pass
 
-    print(f"\n  Azure DevOps Sprint Monitor 已启动")
-    print(f"  本地地址:   http://localhost:{args.web_port}")
+    print(f"\n  Azure DevOps Sprint Monitor started")
+    print(f"  Local:   http://localhost:{args.web_port}")
     if args.public:
         if local_ip != "127.0.0.1":
-            print(f"  网络地址:   http://{local_ip}:{args.web_port}")
-        if not config.WEB_ACCESS_TOKEN:
-            print(f"  警告: 未设置 WEB_ACCESS_TOKEN，任何能访问此地址的人均可查看 Sprint 数据")
-    if config.WEB_ACCESS_TOKEN:
-        print(f"  Web 访问 token 已启用")
+            print(f"  Network: http://{local_ip}:{args.web_port}")
     print()
 
     logger.info("Web 看板启动中，起始端口=%d，绑定地址=%s（端口占用时自动顺延）", args.web_port, host)
