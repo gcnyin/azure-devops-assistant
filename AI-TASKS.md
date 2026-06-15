@@ -1,17 +1,14 @@
 # AI 任务列表
-生成时间: 2026-06-16 02:05:39
+生成时间: 2026-06-16 02:07:13
 运行次数: 2
 最后运行: 2026-06-16 01:58:12
-全局轮次: 6
+全局轮次: 7
 
 共 7 个任务
 
-## 待执行
-
-- [ ] **#13** [low] [质量保障类] 前端缺少组件和 hooks 的单元测试
-  项目有 2476 行 Python 后端测试覆盖（db, web, ai_fix, azure_devops, config, notifier, utils），但前端 React 组件、hooks（useApi, useFilteredItems）没有任何测试。虽然 TanStack Query 的 queryFn 逻辑相对简单，但 useFilteredItems 有较复杂的过滤逻辑（状态、差异类型、搜索），值得编写单元测试确保过滤正确性。使用 vitest + @testing-library/react。
-
 ## 已完成
+
+- [x] **#13** 前端缺少组件和 hooks 的单元测试 (Round 7, 2026-06-16 02:07)
 
 - [x] **#11** 增加 Sprint 选择器支持多 Sprint 历史浏览 (Round 6, 2026-06-16 02:05)
 
