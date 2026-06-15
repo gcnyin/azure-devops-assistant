@@ -38,6 +38,8 @@ logs/
 
 # ── 本地数据库 ──
 sprint_history.db
+sprint_history.db-shm
+sprint_history.db-wal
 *.db
 data/
 
