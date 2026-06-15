@@ -96,6 +96,18 @@ export function useFixesMutation() {
   });
 }
 
+export function useCancelFixMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: number) =>
+      fetch(`/api/fixes/${taskId}/cancel`, { method: "POST" }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fixes"] });
+    },
+  });
+}
+
 export function useHistory() {
   return useQuery<SnapshotItem[]>({
     queryKey: ["history"],

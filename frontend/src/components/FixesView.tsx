@@ -7,10 +7,10 @@ import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useFixes, useFixesMutation } from "@/hooks/useApi";
+import { useFixes, useFixesMutation, useCancelFixMutation } from "@/hooks/useApi";
 import type { FixItem, FixRepoResult } from "@/types/api";
 
-const STATUSES = ["all", "pending", "running", "completed", "failed"] as const;
+const STATUSES = ["all", "pending", "running", "completed", "failed", "cancelled"] as const;
 type FixStatus = (typeof STATUSES)[number];
 
 const STATUS_LABELS: Record<FixStatus, string> = {
@@ -19,6 +19,7 @@ const STATUS_LABELS: Record<FixStatus, string> = {
   running: "Running",
   completed: "Completed",
   failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -26,6 +27,7 @@ const STATUS_DOT: Record<string, string> = {
   running: "bg-accent-amber animate-pulse",
   completed: "bg-success",
   failed: "bg-error",
+  cancelled: "bg-ink-soft/40",
 };
 
 function formatTime(ts: string | null) {
@@ -100,7 +102,7 @@ function RepoResults({
   );
 }
 
-function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => void }) {
+function FixCard({ fix, onRetry, onCancel, cancelling }: { fix: FixItem; onRetry: (bugId: number) => void; onCancel: (taskId: number) => void; cancelling: number | null }) {
   const status = fix.status;
   const dot = STATUS_DOT[status] || "bg-ink-soft/20";
   const duration = getDuration(fix.started_at, fix.finished_at);
@@ -124,10 +126,24 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
         {status === "failed" && (
           <>Started {formatTime(fix.started_at)} · Failed after {duration}</>
         )}
+        {status === "cancelled" && (
+          <>Started {formatTime(fix.started_at)} · Cancelled after {duration}</>
+        )}
       </div>
       {(status === "pending" || status === "running") ? (
-        <div className="bg-surface-card rounded-lg p-4 text-sm text-ink-muted italic">
-          {status === "pending" ? "Waiting in queue..." : "AI agent is analyzing the bug..."}
+        <div className="flex items-center justify-between bg-surface-card rounded-lg p-4">
+          <span className="text-sm text-ink-muted italic">
+            {status === "pending" ? "Waiting in queue..." : "AI agent is analyzing the bug..."}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-error hover:bg-error/10"
+            disabled={cancelling === fix.id}
+            onClick={() => onCancel(fix.id)}
+          >
+            {cancelling === fix.id ? "Cancelling..." : "Cancel"}
+          </Button>
         </div>
       ) : status === "failed" ? (
         <div className="bg-[#3d1a1a] text-error rounded-lg p-4 whitespace-pre-wrap font-mono text-sm leading-relaxed max-h-[480px] overflow-y-auto">
@@ -193,7 +209,9 @@ export function FixesView() {
   const apiStatus = activeStatus === "all" ? undefined : activeStatus;
   const { data: fixes } = useFixes(apiStatus, activeBugId);
   const fixesMutation = useFixesMutation();
+  const cancelMutation = useCancelFixMutation();
   const [q, setQ] = useState("");
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const setStatus = (s: FixStatus) => {
     setSearchParams((prev) => {
@@ -214,7 +232,7 @@ export function FixesView() {
 
   // Count by status from all tasks (unfiltered by status)
   const { data: allFixes } = useFixes(undefined, activeBugId);
-  const counts: Record<string, number> = { all: 0, pending: 0, running: 0, completed: 0, failed: 0 };
+  const counts: Record<string, number> = { all: 0, pending: 0, running: 0, completed: 0, failed: 0, cancelled: 0 };
   for (const f of allFixes || []) {
     counts.all++;
     counts[f.status] = (counts[f.status] || 0) + 1;
@@ -236,6 +254,21 @@ export function FixesView() {
         else toast.error(result.error || "Failed to retry");
       },
       onError: () => toast.error("Failed to retry"),
+    });
+  };
+
+  const handleCancel = (taskId: number) => {
+    setCancellingId(taskId);
+    cancelMutation.mutate(taskId, {
+      onSuccess: (result) => {
+        setCancellingId(null);
+        if (result.ok) toast.success(`Task #${taskId} cancelled`);
+        else toast.error(result.message || "Failed to cancel");
+      },
+      onError: () => {
+        setCancellingId(null);
+        toast.error("Failed to cancel task");
+      },
     });
   };
 
@@ -279,7 +312,7 @@ export function FixesView() {
         ) : (
           <>
             {q && <div className="mb-3 text-[13px] text-ink-muted">{filtered.length} / {fixes.length} fixes match "{q}"</div>}
-            {filtered.map((f) => <FixCard key={f.id} fix={f} onRetry={handleRetry} />)}
+            {filtered.map((f) => <FixCard key={f.id} fix={f} onRetry={handleRetry} onCancel={handleCancel} cancelling={cancellingId} />)}
           </>
         )}
       </div>
