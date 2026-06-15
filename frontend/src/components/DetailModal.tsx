@@ -46,7 +46,15 @@ export function DetailModal({ item, stateColors, onClose }: DetailModalProps) {
             </button>
           </div>
         ) : <div className="text-ink-soft italic mb-6">No description available</div>}
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary font-medium hover:underline text-base">Open in Azure DevOps</a>
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-hairline bg-canvas-soft text-ink-body text-sm font-medium hover:bg-canvas-card hover:border-primary/30 hover:text-primary transition-colors">
+          Open in Azure DevOps
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-soft">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </a>
       </DialogContent>
     </Dialog>
   );
