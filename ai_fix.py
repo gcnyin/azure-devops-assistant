@@ -177,15 +177,30 @@ def _get_repo_name(repo_path: str) -> str:
 
 
 def _build_branch_name(bug: dict) -> str:
-    """根据 Bug 信息生成分支名: ai-fix/{bug_id}-{slug}"""
-    title = bug.get("title", "")
-    # 保留中文、英文、数字、连字符，其余替换为连字符
-    slug = re.sub(r'[^\w\u4e00-\u9fff-]', '-', title)
-    slug = re.sub(r'-{2,}', '-', slug)  # 合并连续连字符
-    slug = slug.strip('-')[:50]  # 截断
-    if not slug:
-        slug = f"bug-{bug['id']}"
-    return f"ai-fix/{bug['id']}-{slug}"
+    """根据 Bug 信息生成分支名: ai-fix/{bug_id}-{YYYYMMDD}-{HHMMSS}"""
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"ai-fix/{bug['id']}-{ts}"
+
+
+def _parse_analysis_result(output: str) -> dict | None:
+    """从 AI agent 输出中解析 ---ANALYSIS--- JSON 块"""
+    m = re.search(r'---ANALYSIS---\s*\n(.*?)(?:\n\s*```)?\s*$', output, re.DOTALL)
+    if not m:
+        m = re.search(r'---ANALYSIS---\s*\n?(\{.*)', output, re.DOTALL)
+    if not m:
+        logger.warning("AI 输出中未找到 ---ANALYSIS--- 标记")
+        return None
+    json_str = m.group(1).strip()
+    json_str = re.sub(r'^```(?:json)?\s*', '', json_str)
+    json_str = re.sub(r'\s*```$', '', json_str)
+    try:
+        result = json.loads(json_str)
+        logger.info("解析 ANALYSIS 成功: target_repos=%s", result.get("target_repos", []))
+        return result
+    except json.JSONDecodeError as e:
+        logger.warning("ANALYSIS JSON 解析失败: %s", e)
+        return None
 
 
 def _parse_fix_result(output: str) -> dict | None:
@@ -210,10 +225,26 @@ def _parse_fix_result(output: str) -> dict | None:
         return None
 
 
+def _restore_repos(repo_states: list[dict]):
+    """恢复所有仓库到原始状态"""
+    for state in reversed(repo_states):
+        try:
+            _git_checkout(state["path"], state["original_branch"])
+            if state["stashed"]:
+                _git_stash_pop(state["path"])
+        except Exception:
+            logger.exception("[%s] 恢复仓库状态失败", os.path.basename(state["path"]))
+
+
 # ── 主处理逻辑 ──
 
 def _process_one(task_id: int, bug: dict, prompt: str):
-    """处理单个修复任务：准备仓库 -> AI修复 -> push -> 创建PR -> 恢复现场"""
+    """处理单个修复任务：分析阶段定位 -> 修复阶段修改 -> push -> 创建PR -> 恢复现场
+
+    两阶段流程：
+    1. 分析阶段：所有仓库 stash → checkout develop → pull，AI 只读代码定位目标仓库
+    2. 修复阶段：仅对目标仓库创建 fix 分支，AI 修改代码并提交
+    """
     update_fix_task_status(task_id, STATUS_RUNNING, started_at="now")
     logger.info("开始处理任务 #%d: Bug #%d - %s", task_id, bug["id"], bug["title"])
 
@@ -230,7 +261,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         return
 
-    # ── 步骤 2: 准备所有仓库 (stash → checkout develop → pull → create branch) ──
+    # ── 步骤 2: 准备所有仓库用于分析 (stash → checkout develop → pull) ──
     repo_states = []  # [{path, original_branch, stashed}]
     prep_failed = False
     for repo_path in repos:
@@ -240,7 +271,6 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             stashed = _git_stash(repo_path)
             _git_checkout(repo_path, "develop")
             _git_pull(repo_path, "develop")
-            _git_create_branch(repo_path, branch_name)
             repo_states.append({
                 "path": repo_path,
                 "original_branch": original_branch,
@@ -248,7 +278,6 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             })
         except Exception as e:
             logger.error("[%s] 准备仓库失败: %s", repo_name, e)
-            # 尝试恢复已准备的仓库
             for state in reversed(repo_states):
                 try:
                     _git_checkout(state["path"], state["original_branch"])
@@ -267,103 +296,146 @@ def _process_one(task_id: int, bug: dict, prompt: str):
     if prep_failed:
         return
 
-    # ── 步骤 3: 构建完整 prompt 并调用 AI agent ──
-    full_prompt = build_prompt(bug, repos, branch_name)
-    response, agent, agent_error = _try_agent(full_prompt)
+    # ── 步骤 3: 阶段 1 — AI 分析定位目标仓库 ──
+    analysis_prompt = build_analysis_prompt(bug, repos)
+    analysis_response, analysis_agent, analysis_error = _try_agent(analysis_prompt)
 
-    # ── 步骤 4: 解析 AI 输出 ──
+    if analysis_response is None:
+        _restore_repos(repo_states)
+        update_fix_task_status(
+            task_id, STATUS_FAILED,
+            agent_name=analysis_agent,
+            error=analysis_error or "分析阶段无可用的 AI agent",
+            finished_at="now",
+        )
+        logger.warning("任务 #%d 分析阶段失败: %s", task_id, analysis_error)
+        return
+
+    analysis_result = _parse_analysis_result(analysis_response)
+    if not analysis_result or not analysis_result.get("target_repos"):
+        _restore_repos(repo_states)
+        update_fix_task_status(
+            task_id, STATUS_FAILED,
+            agent_name=analysis_agent,
+            error="AI 分析未能定位到目标仓库",
+            response=analysis_response,
+            finished_at="now",
+        )
+        logger.warning("任务 #%d 分析结果为空", task_id)
+        return
+
+    target_repo_paths = analysis_result["target_repos"]
+    logger.info("分析阶段完成: target_repos=%s, agent=%s", target_repo_paths, analysis_agent)
+
+    # ── 步骤 4: 仅对目标仓库创建 fix 分支 ──
+    target_repos = []
+    for target_path in target_repo_paths:
+        repo_abs = os.path.join(_work_dir, target_path)
+        matched = None
+        for rp in repos:
+            if os.path.normpath(repo_abs) == os.path.normpath(rp):
+                matched = rp
+                break
+        if matched:
+            try:
+                _git_create_branch(matched, branch_name)
+                target_repos.append(matched)
+            except Exception as e:
+                logger.error("[%s] 创建 fix 分支失败: %s", os.path.basename(matched), e)
+        else:
+            logger.warning("分析结果中的仓库路径不在扫描列表中: %s", target_path)
+
+    if not target_repos:
+        _restore_repos(repo_states)
+        update_fix_task_status(
+            task_id, STATUS_FAILED,
+            agent_name=analysis_agent,
+            error="目标仓库验证失败，无法创建 fix 分支",
+            response=analysis_response,
+            finished_at="now",
+        )
+        return
+
+    # ── 步骤 5: 阶段 2 — AI 修复代码 ──
+    fix_prompt = build_prompt(bug, target_repos, branch_name)
+    response, agent, agent_error = _try_agent(fix_prompt)
+
+    # ── 步骤 6: 解析修复结果 ──
     fix_result = None
     if response is not None:
         fix_result = _parse_fix_result(response)
 
-    # ── 步骤 5: push + 创建 PR ──
+    # ── 步骤 7: push + 创建 PR ──
     pr_results = []
+    az_client = None
+
     if fix_result and fix_result.get("success") and fix_result.get("repos"):
         az_client = AzureDevOpsClient()
         for repo_result in fix_result["repos"]:
             repo_rel_path = repo_result.get("path", "")
             repo_abs_path = os.path.join(_work_dir, repo_rel_path)
-            repo_display = repo_rel_path or os.path.basename(repo_abs_path)
-
-            # 验证仓库路径在 repos 列表中
-            matched_repo = None
-            for rp in repos:
-                if os.path.normpath(repo_abs_path) == os.path.normpath(rp):
-                    matched_repo = rp
-                    break
-            if not matched_repo:
-                logger.warning("仓库路径不在扫描列表中: %s, 跳过 push/PR", repo_abs_path)
-                pr_results.append({**repo_result, "branch": branch_name,
-                                   "pr_url": None, "push_error": "仓库路径不匹配"})
-                continue
-
-            repo_name = _get_repo_name(matched_repo)
+            _push_and_create_pr(
+                repos, repo_abs_path, repo_rel_path, branch_name,
+                bug, bug_id, agent, fix_result, repo_result,
+                az_client, pr_results,
+            )
+    elif response is not None:
+        # 部分成功/失败：提交已存在，仍然尝试 push（不创建 PR）
+        az_client = AzureDevOpsClient()
+        for repo_path in target_repos:
+            repo_display = os.path.basename(repo_path)
+            repo_name = _get_repo_name(repo_path)
             try:
-                _git_push(matched_repo, branch_name)
+                _git_push(repo_path, branch_name)
+                logger.info("[%s] push 成功（无 PR）", repo_display)
+                pr_results.append({
+                    "path": os.path.relpath(repo_path, _work_dir),
+                    "branch": branch_name,
+                    "pr_url": None,
+                    "repo_name": repo_name,
+                    "pr_note": "修复阶段未完全成功，仅 push 分支未创建 PR",
+                })
             except Exception as e:
                 logger.error("[%s] push 失败: %s", repo_display, e)
-                pr_results.append({**repo_result, "branch": branch_name,
-                                   "pr_url": None, "push_error": str(e)})
-                continue
+                pr_results.append({
+                    "path": os.path.relpath(repo_path, _work_dir),
+                    "branch": branch_name,
+                    "pr_url": None,
+                    "push_error": str(e),
+                })
 
-            try:
-                pr_title = f"[AI Fix][{repo_name}] {bug['title']}"
-                pr_desc = _build_pr_description(bug, agent, fix_result, repo_result, repo_name)
-                pr_url = az_client.create_pull_request(
-                    repo_name=repo_name,
-                    source_branch=branch_name,
-                    target_branch="develop",
-                    title=pr_title,
-                    description=pr_desc,
-                )
-                if pr_url:
-                    pr_results.append({**repo_result, "branch": branch_name,
-                                       "pr_url": pr_url, "repo_name": repo_name})
-                    try:
-                        notify_pr_created(bug, repo_name, pr_url, bug_id)
-                    except Exception:
-                        logger.exception("PR 通知发送失败")
-                else:
-                    pr_results.append({**repo_result, "branch": branch_name,
-                                       "pr_url": None, "pr_error": "PR 已存在或创建失败"})
-            except Exception as e:
-                logger.error("[%s] PR 创建失败: %s", repo_display, e)
-                pr_results.append({**repo_result, "branch": branch_name,
-                                   "pr_url": None, "pr_error": str(e)})
+    # ── 步骤 8: 恢复所有仓库 ──
+    _restore_repos(repo_states)
 
-    # ── 步骤 6: 恢复所有仓库 ──
-    for state in reversed(repo_states):
-        try:
-            _git_checkout(state["path"], state["original_branch"])
-            if state["stashed"]:
-                _git_stash_pop(state["path"])
-        except Exception:
-            logger.exception("[%s] 恢复仓库状态失败", os.path.basename(state["path"]))
-
-    # ── 步骤 7: 保存结果 ──
+    # ── 步骤 9: 保存结果 ──
     repo_results_json = json.dumps(pr_results, ensure_ascii=False) if pr_results else None
+    combined_response = (
+        f"[分析阶段: {analysis_agent}]\n\n{analysis_response}\n\n---\n\n"
+        f"[修复阶段: {agent or 'N/A'}]\n\n{response or '(无响应)'}"
+    )
+    final_agent = agent or analysis_agent
 
     if response is not None:
         update_fix_task_status(
             task_id, STATUS_COMPLETED,
-            agent_name=agent,
-            response=response,
+            agent_name=final_agent,
+            response=combined_response,
             repo_results=repo_results_json,
             finished_at="now",
         )
         logger.info("任务 #%d 完成: agent=%s, 响应 %d 字符, PR %d 个",
-                    task_id, agent, len(response),
+                    task_id, final_agent, len(combined_response),
                     sum(1 for r in pr_results if r.get("pr_url")))
     else:
         update_fix_task_status(
             task_id, STATUS_FAILED,
-            agent_name=agent,
-            error=agent_error or "无可用的 AI agent",
-            response=response,
+            agent_name=final_agent,
+            error=agent_error or "修复阶段无可用的 AI agent",
+            response=combined_response,
             repo_results=repo_results_json,
             finished_at="now",
         )
-        logger.warning("任务 #%d 失败: %s", task_id, agent_error)
+        logger.warning("任务 #%d 修复阶段失败: %s", task_id, agent_error)
 
     # ── 触发回调 ──
     with _connect_to_db() as conn:
@@ -375,6 +447,67 @@ def _process_one(task_id: int, bug: dict, prompt: str):
                     cb(task_dict)
                 except Exception:
                     logger.exception("任务完成回调异常")
+
+
+def _push_and_create_pr(
+    repos: list[str],
+    repo_abs_path: str,
+    repo_rel_path: str,
+    branch_name: str,
+    bug: dict,
+    bug_id: int,
+    agent: str | None,
+    fix_result: dict,
+    repo_result: dict,
+    az_client,
+    pr_results: list,
+):
+    """推送分支并创建 PR"""
+    repo_display = repo_rel_path or os.path.basename(repo_abs_path)
+    matched_repo = None
+    for rp in repos:
+        if os.path.normpath(repo_abs_path) == os.path.normpath(rp):
+            matched_repo = rp
+            break
+    if not matched_repo:
+        logger.warning("仓库路径不在扫描列表中: %s, 跳过 push/PR", repo_abs_path)
+        pr_results.append({**repo_result, "branch": branch_name,
+                           "pr_url": None, "push_error": "仓库路径不匹配"})
+        return
+
+    repo_name = _get_repo_name(matched_repo)
+    try:
+        _git_push(matched_repo, branch_name)
+    except Exception as e:
+        logger.error("[%s] push 失败: %s", repo_display, e)
+        pr_results.append({**repo_result, "branch": branch_name,
+                           "pr_url": None, "push_error": str(e)})
+        return
+
+    try:
+        pr_title = f"[AI Fix][{repo_name}] {bug['title']}"
+        pr_desc = _build_pr_description(bug, agent, fix_result, repo_result, repo_name)
+        pr_url = az_client.create_pull_request(
+            repo_name=repo_name,
+            source_branch=branch_name,
+            target_branch="develop",
+            title=pr_title,
+            description=pr_desc,
+        )
+        if pr_url:
+            pr_results.append({**repo_result, "branch": branch_name,
+                               "pr_url": pr_url, "repo_name": repo_name})
+            try:
+                notify_pr_created(bug, repo_name, pr_url, bug_id)
+            except Exception:
+                logger.exception("PR 通知发送失败")
+        else:
+            pr_results.append({**repo_result, "branch": branch_name,
+                               "pr_url": None, "pr_error": "PR 已存在或创建失败"})
+    except Exception as e:
+        logger.error("[%s] PR 创建失败: %s", repo_display, e)
+        pr_results.append({**repo_result, "branch": branch_name,
+                           "pr_url": None, "pr_error": str(e)})
 
 
 def _build_pr_description(bug: dict, agent: str | None, fix_result: dict,
@@ -452,6 +585,40 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
 
 
 # ── 公共接口 ──
+
+def build_analysis_prompt(bug: dict, repos: list[str]) -> str:
+    """生成分析阶段的提示词：只读代码，定位需要修改的仓库"""
+    desc = bug.get("description", "").strip()
+    desc_block = f"\n{desc}\n" if desc else "（无详细描述）"
+
+    repo_lines = "\n".join(f"- {os.path.relpath(r, _work_dir)}" for r in repos)
+
+    prompt = f"""你是一个代码分析助手。下面是一个 Bug，你需要在以下仓库中**只读分析**，定位与 Bug 相关的代码所在的仓库。
+
+Bug ID: {bug['id']}
+Bug 标题: {bug['title']}
+Bug 描述:{desc_block}
+
+可分析的代码仓库（全部已切换到 develop 分支并拉取最新代码）:
+{repo_lines}
+
+要求：
+1. 阅读各仓库中的代码，定位与 Bug 相关的仓库
+2. **不要修改任何文件**，只做代码分析
+3. 在回复的末尾，输出如下格式的 JSON（以 ---ANALYSIS--- 单独一行开头）:
+
+---ANALYSIS---
+{{
+  "target_repos": ["相对于工作目录的仓库路径"],
+  "confidence": "high/medium/low",
+  "reasoning": "分析理由（中文，简洁描述为什么是这些仓库）"
+}}
+
+4. 如果无法定位，设置 target_repos 为空数组，reasoning 说明原因
+5. 用中文回复"""
+    logger.debug("生成分析提示词: Bug #%d (%d 字符), %d 个仓库", bug["id"], len(prompt), len(repos))
+    return prompt
+
 
 def build_prompt(bug: dict, repos: list[str] | None = None, branch_name: str = "") -> str:
     """生成发给 AI agent 的结构化提示词，要求直接修改代码"""

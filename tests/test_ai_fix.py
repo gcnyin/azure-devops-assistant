@@ -25,8 +25,8 @@ class TestBuildPrompt:
         assert "Bug ID: 123" in prompt
         assert "Bug 标题: 登录页面样式错乱" in prompt
         assert "用户反馈登录按钮位置偏移。" in prompt
-        assert "定位相关文件和代码段" in prompt
-        assert "给出具体的修改方案" in prompt
+        assert "定位与 Bug 相关的代码文件" in prompt
+        assert "直接修改源文件" in prompt
         assert "用中文回复" in prompt
 
     def test_empty_description_shows_placeholder(self):
