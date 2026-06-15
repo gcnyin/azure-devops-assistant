@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { getStateColor } from "@/lib/state-color";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
@@ -33,12 +34,12 @@ function FixCell({ item, onTriggerFix, onViewFix }: {
 
   if (!status) {
     return (
-      <button
-        className="text-primary text-[13px] hover:underline cursor-pointer"
+      <Button
+        variant="link" size="sm" className="h-auto px-0"
         onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
       >
         Fix
-      </button>
+      </Button>
     );
   }
 
@@ -56,17 +57,16 @@ function FixCell({ item, onTriggerFix, onViewFix }: {
   }
 
   if (status === "completed") {
-    // We don't have agent_name/duration on WorkItem, so show minimal info
     return (
       <span className="inline-flex items-center gap-1.5 text-[13px]">
         <span className="inline-block w-2 h-2 rounded-full bg-success flex-shrink-0" />
         <span className="text-ink-soft">Done</span>
-        <button
-          className="text-primary hover:underline cursor-pointer ml-1"
+        <Button
+          variant="link" size="sm" className="h-auto px-0"
           onClick={(e) => { e.stopPropagation(); onViewFix?.(item.id); }}
         >
           View
-        </button>
+        </Button>
       </span>
     );
   }
@@ -76,12 +76,12 @@ function FixCell({ item, onTriggerFix, onViewFix }: {
       <span className="inline-flex items-center gap-1.5 text-[13px]">
         <span className="inline-block w-2 h-2 rounded-full bg-error flex-shrink-0" />
         <span className="text-ink-soft">Failed</span>
-        <button
-          className="text-primary hover:underline cursor-pointer ml-1"
+        <Button
+          variant="link" size="sm" className="h-auto px-0"
           onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
         >
           Retry
-        </button>
+        </Button>
       </span>
     );
   }
@@ -96,15 +96,6 @@ export function WorkItemsTable({
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns: ColumnDef<RowType>[] = [];
-
-  if (showFixColumn) {
-    columns.push({
-      id: "fix", header: "AI Fix", size: 110, enableSorting: false,
-      cell: ({ row: tr }) => (
-        <FixCell item={tr.original} onTriggerFix={onTriggerFix} onViewFix={onViewFix} />
-      ),
-    });
-  }
 
   columns.push(
     { id: "id", header: "ID", size: 68, accessorFn: (r) => r.id,
@@ -145,6 +136,15 @@ export function WorkItemsTable({
         if (diffType === "gone") return <span className="diff-tag gone">Gone</span>;
         return null;
       }, enableSorting: false,
+    });
+  }
+
+  if (showFixColumn) {
+    columns.push({
+      id: "fix", header: "AI Fix", size: 100, enableSorting: false,
+      cell: ({ row: tr }) => (
+        <FixCell item={tr.original} onTriggerFix={onTriggerFix} onViewFix={onViewFix} />
+      ),
     });
   }
 
