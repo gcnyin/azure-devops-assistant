@@ -679,11 +679,16 @@ Bug 描述:{desc_block}
 
 
 def enqueue_fix_tasks(bugs: list[dict], sprint_name: str = "") -> list[int]:
-    """将 Bug 列表入队，返回 task_id 列表"""
+    """将 Bug 列表入队，返回 task_id 列表
+
+    入队时存储分析阶段 prompt（与 _process_one 执行流程一致），
+    避免 DB 中 prompt 字段与实际执行内容不一致。
+    """
     start_worker()
+    repos = _scan_repos(_work_dir)
     task_ids = []
     for bug in bugs:
-        prompt = build_prompt(bug)
+        prompt = build_analysis_prompt(bug, repos)
         task_id = create_fix_task(
             bug_id=bug["id"],
             bug_title=bug["title"],
