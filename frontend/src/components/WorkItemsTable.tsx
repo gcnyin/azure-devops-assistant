@@ -22,8 +22,7 @@ export function WorkItemsTable({ items, rowType, onRowClick, showDiffColumn, dif
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns: ColumnDef<RowType>[] = [
-    { id: "index", header: "#", size: 42, cell: ({ row }) => <span className="text-ink-soft">{row.index + 1}</span>, enableSorting: false },
-    { id: "id", header: "ID", size: 56, accessorFn: (r) => r.id,
+    { id: "id", header: "ID", size: 68, accessorFn: (r) => r.id,
       cell: ({ getValue }) => <span className="text-ink font-medium tabular-nums">{String(getValue())}</span> },
     { id: "title", header: "Title", accessorFn: (r) => r.title,
       cell: ({ row: tr }) => {
