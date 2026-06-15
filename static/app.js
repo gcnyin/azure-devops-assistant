@@ -104,10 +104,9 @@ function openDetailModal(item) {
         : '<div class="no-desc">No description available</div>';
     var url = item.htmlUrl || ('https://dev.azure.com/_workitems/edit/' + item.id);
     var stateColor = getStateColor(item.state);
-    var icon = getTypeIcon(item.type);
 
     document.getElementById('modalContent').innerHTML =
-        '<h3>' + icon + ' ' + escapeHtml(item.title) + '</h3>' +
+        '<h3>' + escapeHtml(item.title) + '</h3>' +
         '<div class="wi-meta">' +
             '<span>#' + item.id + '</span>' +
             '<span>' + escapeHtml(item.type) + '</span>' +
@@ -285,14 +284,13 @@ function renderBoardTable() {
                 + it.state + '</span>';
         }
 
-        var icon = getTypeIcon(it.type);
         var rowNum = items.indexOf(it) + 1;
 
         html += '<tr class="' + rowClass + '" onclick="openDetailModal(allItems[' + origIdx + '])">'
             + '<td class="text-dim">' + rowNum + '</td>'
             + '<td><span class="wi-id">' + it.id + '</span></td>'
             + '<td style="' + titleStyle + '">' + prefix + escapeHtml(it.title) + '</td>'
-            + '<td><span class="type-icon">' + icon + '</span> ' + escapeHtml(it.type) + '</td>'
+            + '<td>' + escapeHtml(it.type) + '</td>'
             + '<td>' + stateHtml + '</td>'
             + '<td class="assigned-cell">' + escapeHtml(it.assignedTo || 'Unassigned') + '</td>'
             + '</tr>';
@@ -409,12 +407,11 @@ async function loadSnapshotDetail(snapshotId, sprintName, fetchedAt) {
         }
         items.forEach(function (it, idx) {
             var stateColor = getStateColor(it.state);
-            var icon = getTypeIcon(it.type);
             html += '<tr onclick="openDetailModal(historyItems[' + idx + '])">'
                 + '<td class="text-dim">' + (idx + 1) + '</td>'
                 + '<td><span class="wi-id">' + it.id + '</span></td>'
                 + '<td>' + escapeHtml(it.title) + '</td>'
-                + '<td><span class="type-icon">' + icon + '</span> ' + escapeHtml(it.type) + '</td>'
+                + '<td>' + escapeHtml(it.type) + '</td>'
                 + '<td><span class="state-badge" style="background:' + stateColor + '24;color:' + stateColor + '">' + escapeHtml(it.state) + '</span></td>'
                 + '<td class="assigned-cell">' + escapeHtml(it.assignedTo || 'Unassigned') + '</td>'
                 + '</tr>';

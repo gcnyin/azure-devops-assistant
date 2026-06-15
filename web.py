@@ -14,7 +14,7 @@ from typing import Any
 from flask import Flask, jsonify, render_template
 
 from config import Config
-from renderer import state_color_hex, state_bg_hex, type_icon, STATE_COLORS_HEX, _TYPE_ICONS
+from renderer import state_color_hex, state_bg_hex, STATE_COLORS_HEX
 from db import list_snapshots, load_snapshot_by_id, load_previous_items
 from utils import get_logger
 
@@ -153,12 +153,10 @@ def index():
     import json as _json
     incomplete_states_json = _json.dumps(Config_QUERY_STATES, ensure_ascii=False)
     state_colors_json = _json.dumps(STATE_COLORS_HEX, ensure_ascii=False)
-    type_icons_json = _json.dumps(_TYPE_ICONS, ensure_ascii=False)
     return render_template(
         "index.html",
         incomplete_states=incomplete_states_json,
         state_colors=state_colors_json,
-        type_icons=type_icons_json,
     )
 
 

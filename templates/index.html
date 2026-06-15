@@ -12,7 +12,6 @@
     <script>
         window.INCOMPLETE_STATES_RAW = {{ incomplete_states|safe }};
         window.STATE_COLORS = {{ state_colors|safe }};
-        window.TYPE_ICONS = {{ type_icons|safe }};
     </script>
 </head>
 <body>
@@ -120,9 +119,6 @@
     <script>
         function getStateColor(state) {
             return (window.STATE_COLORS || {})[state.toLowerCase()] || '#9c9c9d';
-        }
-        function getTypeIcon(type) {
-            return (window.TYPE_ICONS || {})[type.toLowerCase()] || '\uD83D\uDCCC';
         }
     </script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>

@@ -121,11 +121,11 @@ def notify_changes(
 
         fields = []
         if new_count:
-            fields.append({"title": "✨ 新增", "value": str(new_count), "short": True})
+            fields.append({"title": "[新增]", "value": str(new_count), "short": True})
         if changed_count:
-            fields.append({"title": "🔄 状态变化", "value": str(changed_count), "short": True})
+            fields.append({"title": "[状态变化]", "value": str(changed_count), "short": True})
         if gone_count:
-            fields.append({"title": "👻 消失", "value": str(gone_count), "short": True})
+            fields.append({"title": "[消失]", "value": str(gone_count), "short": True})
 
         payload = {
             "attachments": [
