@@ -1,15 +1,12 @@
 # AI 任务列表
-生成时间: 2026-06-16 01:55:09
+生成时间: 2026-06-16 01:55:23
 运行次数: 1
 最后运行: 2026-06-16 01:54:47
-全局轮次: 1
+全局轮次: 2
 
 共 13 个任务
 
 ## 待执行
-
-- [ ] **#2** [high] [修复类] Dockerfile COPY 引用不存在的 templates/ 目录
-  Dockerfile 第 30 行 COPY templates/ templates/ 引用了一个不存在的目录（项目中已无 templates/，前端已改用 SPA 模式，全部通过 static/ 服务）。执行 docker build 会直接失败。应删除该行。
 
 - [ ] **#3** [high] [功能开发类] WEB_ACCESS_TOKEN 认证中间件未实现
   config.py 和 .env.example 中定义了 WEB_ACCESS_TOKEN 配置项，README 也提到可用于保护 API，但 web.py 完全没有实现认证中间件。所有 API 路由（除 /health）都是公开的，生产环境部署存在安全风险。需在 web.py 中添加 Flask before_request 钩子，对非 /health 路由检查 Authorization: Bearer <token> 请求头。
@@ -47,3 +44,5 @@
 ## 已完成
 
 - [x] **#1** test_server.py 引用不存在的 save_ai_fix 函数 (Round 1, 2026-06-16 01:55)
+
+- [x] **#2** Dockerfile COPY 引用不存在的 templates/ 目录 (Round 2, 2026-06-16 01:55)

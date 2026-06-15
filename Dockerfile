@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制项目源码
 COPY *.py .
 COPY static/ static/
-COPY templates/ templates/
 
 # 创建运行时目录（logs、数据库等通过 volume 挂载到宿主机）
 RUN mkdir -p /app/logs
