@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router";
+import { Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { BoardRoute } from "@/routes/BoardRoute";
 import FixesRoute from "@/routes/FixesRoute";
@@ -9,6 +10,16 @@ import { DiffView } from "@/components/DiffView";
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#181715",
+            color: "#faf9f5",
+            border: "1px solid #252320",
+          },
+        }}
+      />
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<BoardRoute />} />

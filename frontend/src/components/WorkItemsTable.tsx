@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { getStateColor } from "@/lib/state-color";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
@@ -16,12 +17,59 @@ interface WorkItemsTableProps {
   showDiffColumn?: boolean;
   diffType?: DiffFilterType;
   stateColors: Record<string, string>;
+  showFixColumn?: boolean;
+  selectedBugIds?: Set<number>;
+  onBugToggle?: (bugId: number) => void;
+  onFixDotClick?: (e: React.MouseEvent, bugId: number) => void;
 }
 
-export function WorkItemsTable({ items, rowType, onRowClick, showDiffColumn, diffType, stateColors }: WorkItemsTableProps) {
+function FixDot({ status }: { status?: string | null }) {
+  if (!status) return <span className="inline-block w-2 h-2 rounded-full bg-ink-soft/20 flex-shrink-0" />;
+  const map: Record<string, string> = {
+    pending: "bg-ink-soft/40",
+    running: "bg-accent-amber animate-pulse",
+    completed: "bg-success",
+    failed: "bg-error",
+  };
+  const color = map[status] || "bg-ink-soft/20";
+  return <span className={`inline-block w-2 h-2 rounded-full ${color} flex-shrink-0`}
+    title={`Fix: ${status}`} />;
+}
+
+export function WorkItemsTable({
+  items, rowType, onRowClick, showDiffColumn, diffType, stateColors,
+  showFixColumn, selectedBugIds, onBugToggle, onFixDotClick,
+}: WorkItemsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
-  const columns: ColumnDef<RowType>[] = [
+  const columns: ColumnDef<RowType>[] = [];
+
+  // 修复状态列（圆点 + checkbox）
+  if (showFixColumn) {
+    columns.push({
+      id: "fix", header: "", size: 44, enableSorting: false,
+      cell: ({ row: tr }) => {
+        const it = tr.original;
+        const isBug = (it.type || "").toLowerCase() === "bug";
+        if (!isBug) return <span className="w-8" />;
+        const isSelected = selectedBugIds?.has(it.id) ?? false;
+        return (
+          <span className="inline-flex items-center gap-2">
+            <span onClick={(e) => onFixDotClick?.(e, it.id)}>
+              <FixDot status={it._fix_status} />
+            </span>
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onBugToggle?.(it.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </span>
+        );
+      },
+    });
+  }
+
+  columns.push(
     { id: "id", header: "ID", size: 68, accessorFn: (r) => r.id,
       cell: ({ getValue }) => <span className="text-ink font-medium tabular-nums">{String(getValue())}</span> },
     { id: "title", header: "Title", accessorFn: (r) => r.title,
@@ -50,7 +98,7 @@ export function WorkItemsTable({ items, rowType, onRowClick, showDiffColumn, dif
       }},
     { id: "assignedTo", header: "Owner", size: 96, accessorFn: (r) => r.assignedTo || "Unassigned",
       cell: ({ getValue }) => <span className="text-ink-body font-medium">{String(getValue())}</span> },
-  ];
+  );
 
   if (showDiffColumn) {
     columns.push({ id: "change", header: "Change", size: 76,
@@ -76,8 +124,9 @@ export function WorkItemsTable({ items, rowType, onRowClick, showDiffColumn, dif
         {table.getHeaderGroups().map((hg) => (
           <TableRow key={hg.id} className="hover:bg-transparent cursor-default">
             {hg.headers.map((h) => (
-              <TableHead key={h.id} style={{ width: h.getSize() }} className="cursor-pointer select-none"
-                onClick={h.column.getToggleSortingHandler()}>
+              <TableHead key={h.id} style={{ width: h.getSize() }}
+                className={h.column.getCanSort() ? "cursor-pointer select-none" : ""}
+                onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}>
                 {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                 {h.column.getIsSorted() === "asc" ? " \u2191" : h.column.getIsSorted() === "desc" ? " \u2193" : ""}
               </TableHead>

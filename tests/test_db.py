@@ -145,10 +145,10 @@ class TestDbCRUD:
         self.temp_dir = temp_db_dir
 
     def test_init_db_creates_tables(self):
-        """init_db 创建 sprint_snapshot 和 ai_fixes 表"""
+        """init_db 创建 sprint_snapshot 和 fix_tasks 表"""
         tables = self._get_table_names()
         assert "sprint_snapshot" in tables
-        assert "ai_fixes" in tables
+        assert "fix_tasks" in tables
 
     def test_save_and_load_snapshot(self):
         """保存快照后能正确加载"""
@@ -187,25 +187,66 @@ class TestDbCRUD:
         conn.close()
         assert count <= 10
 
-    def test_save_and_get_ai_fixes(self):
-        """保存和获取 AI 修复建议"""
-        self.db.save_ai_fix(123, "登录页面样式错乱", "修复方案: 修改 CSS...")
-        fixes = self.db.get_ai_fixes()
-        assert len(fixes) >= 1
-        # 找到刚保存的
-        matched = [f for f in fixes if f["bug_id"] == 123]
-        assert len(matched) == 1
-        assert matched[0]["bug_title"] == "登录页面样式错乱"
-        assert "修复方案" in matched[0]["response"]
+    def test_create_and_get_fix_tasks(self):
+        """创建和获取修复任务"""
+        tid = self.db.create_fix_task(123, "Bug Title", sprint_name="Sprint 1")
+        assert tid > 0
+        tasks = self.db.get_fix_tasks()
+        matched = [t for t in tasks if t["bug_id"] == 123]
+        assert len(matched) >= 1
+        assert matched[0]["status"] == "pending"
+        assert matched[0]["sprint_name"] == "Sprint 1"
 
-    def test_ai_fix_upsert(self):
-        """再次保存同 bug_id 时更新内容（INSERT OR REPLACE）"""
-        self.db.save_ai_fix(123, "标题 v1", "方案 v1")
-        self.db.save_ai_fix(123, "标题 v2", "方案 v2")
-        fixes = self.db.get_ai_fixes()
-        matched = [f for f in fixes if f["bug_id"] == 123]
+    def test_update_fix_task_status(self):
+        """更新任务状态"""
+        tid = self.db.create_fix_task(456, "Another Bug")
+        self.db.update_fix_task_status(tid, "completed", response="Fixed!", finished_at="now", agent_name="pi")
+        tasks = self.db.get_fix_tasks(bug_id=456)
+        assert len(tasks) >= 1
+        matched = [t for t in tasks if t["id"] == tid]
         assert len(matched) == 1
-        assert matched[0]["bug_title"] == "标题 v2"
+        assert matched[0]["status"] == "completed"
+        assert matched[0]["response"] == "Fixed!"
+        assert matched[0]["agent_name"] == "pi"
+        assert matched[0]["finished_at"] is not None
+
+    def test_get_fix_tasks_status_filter(self):
+        """按状态过滤任务"""
+        t1 = self.db.create_fix_task(1, "Bug 1")
+        t2 = self.db.create_fix_task(2, "Bug 2")
+        self.db.update_fix_task_status(t1, "completed", response="done", finished_at="now")
+        completed = self.db.get_fix_tasks(status="completed")
+        assert all(t["status"] == "completed" for t in completed)
+        pending = self.db.get_fix_tasks(status="pending")
+        assert all(t["status"] == "pending" for t in pending)
+
+    def test_get_fix_tasks_multi_status(self):
+        """多状态过滤"""
+        t1 = self.db.create_fix_task(1, "Bug 1")
+        self.db.update_fix_task_status(t1, "failed", error="timeout", finished_at="now")
+        tasks = self.db.get_fix_tasks(status=["pending", "failed"])
+        assert all(t["status"] in ("pending", "failed") for t in tasks)
+
+    def test_get_bug_fix_status_map(self):
+        """获取每个 bug 的最新状态映射"""
+        tid = self.db.create_fix_task(100, "Bug X")
+        self.db.update_fix_task_status(tid, "running", started_at="now")
+        status_map = self.db.get_bug_fix_status_map()
+        assert 100 in status_map
+        assert status_map[100]["status"] == "running"
+        assert status_map[100]["task_id"] == tid
+
+    def test_same_bug_multiple_tasks(self):
+        """同一 bug 可创建多个任务记录"""
+        tid1 = self.db.create_fix_task(200, "Bug", sprint_name="S1")
+        self.db.update_fix_task_status(tid1, "completed", response="v1", finished_at="now")
+        tid2 = self.db.create_fix_task(200, "Bug", sprint_name="S2")
+        self.db.update_fix_task_status(tid2, "running", started_at="now")
+        tasks = self.db.get_fix_tasks(bug_id=200)
+        assert len(tasks) >= 2
+        # 最新状态映射应指向 running（最后创建的）
+        status_map = self.db.get_bug_fix_status_map()
+        assert status_map[200]["status"] == "running"
 
     def test_list_snapshots_filtered(self):
         """按 sprint_name 过滤列出快照"""

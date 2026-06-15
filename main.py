@@ -244,10 +244,6 @@ def check_once(
 def main():
     parser = argparse.ArgumentParser(description="Azure DevOps Sprint Board Monitor (Web UI)")
     parser.add_argument("--interval", type=int, default=None, help="Check interval in minutes")
-    parser.add_argument(
-        "--ai-fix", action="store_true",
-        help="Auto-generate AI fix suggestions when new bugs are detected",
-    )
     parser.add_argument("-w", "--web-port", type=int, default=8080,
                        metavar="PORT",
                        help="Web UI start port (default 8080)")
@@ -330,8 +326,10 @@ def main():
 
     # 设置 Web 配置
     from web import set_web_query_states, set_web_work_dir
+    from ai_fix import set_timeout as ai_set_timeout
     set_web_query_states(config.QUERY_STATES)
     set_web_work_dir(config.WORK_DIR)
+    ai_set_timeout(config.AI_FIX_TIMEOUT_SECONDS)
 
     # 确定监听地址
     host = "0.0.0.0" if args.public else "127.0.0.1"

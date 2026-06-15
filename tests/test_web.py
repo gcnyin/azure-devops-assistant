@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from web import app, update_cached_data, get_cached_data, set_web_token, set_web_query_states
+from web import app, update_cached_data, get_cached_data, set_web_query_states
 
 
 @pytest.fixture
@@ -196,21 +196,32 @@ class TestApiFixesRoute:
     """GET /api/fixes 路由测试"""
 
     def test_returns_200(self, client):
-        """返回 200"""
         resp = client.get("/api/fixes")
         assert resp.status_code == 200
 
     def test_returns_json_array(self, client):
-        """返回 JSON 数组"""
         resp = client.get("/api/fixes")
         data = resp.get_json()
         assert isinstance(data, list)
 
-    def test_returns_fixes_when_saved(self, client):
-        """数据库中有修复建议时返回内容"""
-        from db import init_db, save_ai_fix
-        # 使用默认数据库（测试环境可能已有数据）
-        resp = client.get("/api/fixes")
+    def test_status_filter(self, client):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(100, "Test Bug", sprint_name="Sprint 1")
+        update_fix_task_status(tid, "completed", response="Fixed", finished_at="now", agent_name="pi")
+        resp = client.get("/api/fixes?status=completed")
+        data = resp.get_json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert all(it["status"] == "completed" for it in data)
+
+    def test_bug_id_filter(self, client):
+        resp = client.get("/api/fixes?bug_id=99999")
+        data = resp.get_json()
+        assert isinstance(data, list)
+
+    def test_status_all(self, client):
+        resp = client.get("/api/fixes?status=all")
         data = resp.get_json()
         assert isinstance(data, list)
 
@@ -476,97 +487,6 @@ class TestIndexRoute:
         assert "text/html" in resp.content_type
 
 
-class TestLoginRoute:
-    """GET/POST /login 路由测试"""
-
-    @pytest.fixture(autouse=True)
-    def clear_token(self):
-        """每个测试后清除 token 配置"""
-        yield
-        set_web_token("")
-
-    def test_get_login_returns_200(self, client):
-        """GET /login 返回 200"""
-        resp = client.get("/login")
-        assert resp.status_code == 200
-
-    def test_get_login_returns_html(self, client):
-        """GET /login 返回 HTML"""
-        resp = client.get("/login")
-        assert "text/html" in resp.content_type
-
-    def test_get_login_contains_form(self, client):
-        """GET /login 页面包含登录表单"""
-        resp = client.get("/login")
-        html = resp.get_data(as_text=True)
-        assert "loginForm" in html
-        assert "tokenInput" in html
-
-    def test_post_login_no_token_configured_returns_ok(self, client):
-        """未配置 token 时，POST /login 直接返回 ok"""
-        set_web_token("")
-        resp = client.post("/login", json={"token": "anything"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["ok"] is True
-
-    def test_post_login_empty_token_when_configured_returns_error(self, client):
-        """配置了 token 时，提交空 token 返回错误"""
-        set_web_token("my-secret")
-        resp = client.post("/login", json={"token": ""})
-        assert resp.status_code == 401
-        data = resp.get_json()
-        assert data["ok"] is False
-
-    def test_post_login_wrong_token_returns_error(self, client):
-        """提交错误 token 返回 401"""
-        set_web_token("correct-token")
-        resp = client.post("/login", json={"token": "wrong-token"})
-        assert resp.status_code == 401
-        data = resp.get_json()
-        assert data["ok"] is False
-        assert "error" in data
-
-    def test_post_login_correct_token_returns_ok(self, client):
-        """提交正确 token 返回 ok"""
-        set_web_token("correct-token")
-        resp = client.post("/login", json={"token": "correct-token"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["ok"] is True
-
-    def test_index_redirects_to_login_when_token_required(self, client):
-        """配置了 token 时，浏览器访问 / 应重定向到 /login"""
-        set_web_token("my-secret")
-        resp = client.get("/", headers={"Accept": "text/html"})
-        assert resp.status_code == 302
-        assert "/login" in resp.headers.get("Location", "")
-
-    def test_index_redirects_with_next_param(self, client):
-        """访问其他页面时重定向携带 next 参数"""
-        set_web_token("my-secret")
-        resp = client.get("/api/history", headers={"Accept": "text/html"})
-        assert resp.status_code == 302
-        location = resp.headers.get("Location", "")
-        assert "/login" in location
-        assert "next=" in location
-
-    def test_index_no_redirect_when_no_token_configured(self, client):
-        """未配置 token 时，/ 正常返回不重定向"""
-        set_web_token("")
-        resp = client.get("/", headers={"Accept": "text/html"})
-        assert resp.status_code == 200
-
-    def test_api_returns_401_json_when_token_missing(self, client):
-        """API 请求缺少 token 时返回 401 JSON（不重定向）"""
-        set_web_token("my-secret")
-        resp = client.get("/api/data")
-        assert resp.status_code == 401
-        assert resp.content_type == "application/json"
-        data = resp.get_json()
-        assert "Unauthorized" in data.get("error", "")
-
-
 class TestGetCachedData:
     """缓存读写测试"""
 
@@ -608,82 +528,65 @@ class TestGetCachedData:
 class TestApiFixesRunRoute:
     """POST /api/fixes/run 路由测试"""
 
-    def test_no_diff_info_returns_ok_empty(self, client):
-        """无 diff_info 时返回空结果"""
-        resp = client.post("/api/fixes/run")
+    def test_no_bug_ids_returns_ok_empty(self, client):
+        resp = client.post("/api/fixes/run", json={})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
-        assert data["results"] == []
+        assert data["task_ids"] == []
 
-    def test_no_new_items_returns_ok_empty(self, client):
-        """diff_info 无 new_items 时返回空结果"""
-        update_cached_data(
-            iteration={}, items=[], diff_info={"new_items": []},
-            team_name="T", project="P",
-        )
-        resp = client.post("/api/fixes/run")
+    def test_no_bug_ids_in_body_returns_ok_empty(self, client):
+        resp = client.post("/api/fixes/run", json={"bug_ids": []})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
-        assert data["results"] == []
+        assert data["task_ids"] == []
 
-    def test_no_new_bugs_returns_ok_empty(self, client):
-        """新增条目中没有 Bug 时返回空结果"""
+    def test_bug_ids_not_in_cache_returns_ok_empty(self, client):
+        """bug_ids 不在缓存中时返回空"""
         update_cached_data(
-            iteration={}, items=[],
-            diff_info={
-                "new_items": [
-                    {"id": 1, "title": "Task A", "state": "To Do", "type": "Task", "assignedTo": "Test"},
-                ]
-            },
+            iteration={"name": "Sprint 1"}, items=[], diff_info=None,
             team_name="T", project="P",
         )
-        resp = client.post("/api/fixes/run")
+        resp = client.post("/api/fixes/run", json={"bug_ids": [999]})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
-        assert data["results"] == []
-        assert "没有 Bug" in data.get("message", "")
+        assert data["task_ids"] == []
 
-    def test_new_bugs_calls_process_new_bugs(self, client, mocker):
-        """有新增 Bug 时调用 process_new_bugs 并返回结果"""
-        mock_result = [(123, "登录崩溃", "[agent: pi]\n\n修复方案: ...")]
-        mocker.patch("web.process_new_bugs", return_value=mock_result)
+    def test_valid_bugs_queued(self, client, mocker):
+        """有效的 Bug 被入队，返回 task_ids"""
+        mock_enqueue = mocker.patch("web.enqueue_fix_tasks", return_value=[1, 2])
 
         update_cached_data(
-            iteration={}, items=[],
-            diff_info={
-                "new_items": [
-                    {"id": 123, "title": "登录崩溃", "state": "To Do", "type": "Bug", "assignedTo": "Test"},
-                    {"id": 456, "title": "UI Task", "state": "To Do", "type": "Task", "assignedTo": "Test"},
-                ]
-            },
+            iteration={"name": "Sprint 1"},
+            items=[
+                {"id": 123, "title": "Bug A", "state": "To Do", "type": "Bug", "assignedTo": "T"},
+                {"id": 456, "title": "Bug B", "state": "Active", "type": "Bug", "assignedTo": "T"},
+            ],
+            diff_info=None,
             team_name="T", project="P",
         )
-        resp = client.post("/api/fixes/run")
+        resp = client.post("/api/fixes/run", json={"bug_ids": [123, 456]})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["ok"] is True
-        assert len(data["results"]) == 1
-        assert data["results"][0]["bug_id"] == 123
-        assert data["results"][0]["bug_title"] == "登录崩溃"
-        assert "pi" in data["results"][0]["response"]
+        assert data["task_ids"] == [1, 2]
+        assert "queued" in data.get("message", "").lower()
 
-    def test_process_new_bugs_exception_returns_500(self, client, mocker):
-        """process_new_bugs 抛出异常时返回 500"""
-        mocker.patch("web.process_new_bugs", side_effect=RuntimeError("agent timeout"))
+    def test_enqueue_exception_returns_500(self, client, mocker):
+        """入队异常返回 500"""
+        mocker.patch("web.enqueue_fix_tasks", side_effect=RuntimeError("queue failure"))
 
         update_cached_data(
-            iteration={}, items=[],
-            diff_info={
-                "new_items": [
-                    {"id": 123, "title": "Bug", "state": "To Do", "type": "Bug", "assignedTo": "Test"},
-                ]
-            },
+            iteration={"name": "Sprint 1"},
+            items=[
+                {"id": 123, "title": "Bug X", "state": "To Do", "type": "Bug", "assignedTo": "T"},
+            ],
+            diff_info=None,
             team_name="T", project="P",
         )
-        resp = client.post("/api/fixes/run")
+        resp = client.post("/api/fixes/run", json={"bug_ids": [123]})
         assert resp.status_code == 500
         data = resp.get_json()
         assert data["ok"] is False

@@ -8,6 +8,7 @@ export interface WorkItem {
   htmlUrl?: string;
   _state_changed?: boolean;
   _prev_state?: string;
+  _fix_status?: string | null;
 }
 
 export interface Iteration {
@@ -39,10 +40,19 @@ export interface BoardData {
 }
 
 export interface FixItem {
+  id: number;
   bug_id: number;
   bug_title: string;
-  response: string;
-  updated_at: string;
+  work_item_type: string;
+  sprint_name: string;
+  status: string;
+  agent_name: string | null;
+  prompt: string | null;
+  response: string | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 export interface SnapshotItem {

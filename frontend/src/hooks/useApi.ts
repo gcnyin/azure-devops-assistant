@@ -34,11 +34,15 @@ export function useBoardData(view: string) {
   });
 }
 
-export function useFixes() {
+export function useFixes(status?: string, bugId?: number) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (bugId) params.set("bug_id", String(bugId));
+  const qs = params.toString();
   return useQuery<FixItem[]>({
-    queryKey: ["fixes"],
-    queryFn: () => fetchJson("/api/fixes"),
-    refetchInterval: 60_000,
+    queryKey: ["fixes", status, bugId],
+    queryFn: () => fetchJson(`/api/fixes${qs ? `?${qs}` : ""}`),
+    refetchInterval: 15_000,
   });
 }
 
@@ -46,10 +50,12 @@ export function useFixesMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () =>
-      fetchJson<{ ok: boolean; error?: string; message?: string }>(
-        "/api/fixes/run",
-      ),
+    mutationFn: (bugIds: number[]) =>
+      fetch("/api/fixes/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bug_ids: bugIds }),
+      }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixes"] });
     },

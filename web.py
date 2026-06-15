@@ -14,8 +14,12 @@ from typing import Any
 from flask import Flask, jsonify, request, Response, send_file
 
 from renderer import STATE_COLORS_HEX
-from db import list_snapshots, load_snapshot_by_id, load_previous_items, get_ai_fixes, diff_items
-from ai_fix import process_new_bugs
+from db import (
+    list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
+    get_fix_tasks, get_bug_fix_status_map, ALL_STATUSES,
+)
+from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, set_timeout as ai_set_timeout, add_finish_callback
+from notifier import notify_fix_tasks_completed
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -44,6 +48,7 @@ _work_dir: str = "."
 def set_web_work_dir(work_dir: str):
     global _work_dir
     _work_dir = work_dir or "."
+    ai_set_work_dir(_work_dir)
 
 
 def set_web_query_states(states: list[str]):
@@ -125,9 +130,18 @@ def api_data():
             filtered_diff["gone_items"] = _filter_by_user(diff_info.get("gone_items", []))
             diff_info = filtered_diff
 
+    # 附加每个 Bug 的修复状态
+    fix_status_map = get_bug_fix_status_map()
+    items_with_status = []
+    for it in items:
+        it_copy = dict(it)
+        status_info = fix_status_map.get(it["id"])
+        it_copy["_fix_status"] = status_info["status"] if status_info else None
+        items_with_status.append(it_copy)
+
     return jsonify({
         "iteration": data["iteration"],
-        "items": items,
+        "items": items_with_status,
         "diff_info": diff_info,
         "last_update": data["last_update"],
         "assigned_to": data["assigned_to"],
@@ -141,31 +155,50 @@ def api_data():
 
 @app.route("/api/fixes")
 def api_fixes():
-    fixes = get_ai_fixes()
-    return jsonify(fixes)
+    status_str = request.args.get("status", "")
+    bug_id_str = request.args.get("bug_id", "")
+
+    status = None
+    if status_str:
+        parts = [s.strip() for s in status_str.split(",") if s.strip() in ALL_STATUSES]
+        if len(parts) == 1:
+            status = parts[0]
+        elif len(parts) > 1:
+            status = parts
+
+    bug_id = int(bug_id_str) if bug_id_str else None
+
+    tasks = get_fix_tasks(status=status, bug_id=bug_id)
+    return jsonify(tasks)
 
 
 @app.route("/api/fixes/run", methods=["POST"])
 def api_fixes_run():
+    body = request.get_json(silent=True) or {}
+    bug_ids = body.get("bug_ids", [])
+
+    if not bug_ids:
+        return jsonify({"ok": True, "task_ids": [], "message": "No bug IDs provided"})
+
     data = get_cached_data()
-    diff_info = data.get("diff_info")
-    if not diff_info or not diff_info.get("new_items"):
-        return jsonify({"ok": True, "results": [], "message": "No new work items to analyze"})
-    new_bugs = [it for it in diff_info["new_items"] if it.get("type") == "Bug"]
-    if not new_bugs:
-        return jsonify({"ok": True, "results": [], "message": "No bugs in new items"})
+    all_items = data.get("items", [])
+    sprint_name = data.get("iteration", {}).get("name", "")
+
+    items_by_id = {it["id"]: it for it in all_items}
+    bugs = [items_by_id[bid] for bid in bug_ids if bid in items_by_id]
+
+    if not bugs:
+        return jsonify({"ok": True, "task_ids": [], "message": "No matching bugs found in current data"})
+
     try:
-        results = process_new_bugs(new_bugs, _work_dir)
+        task_ids = enqueue_fix_tasks(bugs, sprint_name=sprint_name)
         return jsonify({
             "ok": True,
-            "results": [
-                {"bug_id": r[0], "bug_title": r[1], "response": r[2]}
-                for r in results
-            ],
-            "message": f"Generated fixes for {len(results)}/{len(new_bugs)} bugs",
+            "task_ids": task_ids,
+            "message": f"{len(task_ids)} fix tasks queued",
         })
     except Exception as e:
-        logger.error("AI fix generation failed: %s", e)
+        logger.error("AI fix task creation failed: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
 
 

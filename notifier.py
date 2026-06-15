@@ -157,3 +157,15 @@ def notify_changes(
             ]
         }
         _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
+
+
+def notify_fix_tasks_completed(completed: int, failed: int, total: int, config: Config):
+    """修复任务批次完成时发送桌面通知"""
+    if not config.NOTIFY_DESKTOP:
+        return
+    if completed > 0:
+        title = "AI Fixes Ready"
+        body = f"{completed} fix suggestion{'s' if completed > 1 else ''} ready"
+        if failed > 0:
+            body += f", {failed} failed"
+        _send_desktop(title, body)

@@ -32,13 +32,23 @@ def init_db():
                 work_items_json TEXT NOT NULL
             )
         """)
+        # 删除旧 ai_fixes 表（schema 已重新设计）
+        conn.execute("DROP TABLE IF EXISTS ai_fixes")
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS ai_fixes (
-                bug_id INTEGER PRIMARY KEY,
-                bug_title TEXT,
+            CREATE TABLE IF NOT EXISTS fix_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bug_id INTEGER NOT NULL,
+                bug_title TEXT NOT NULL DEFAULT '',
+                work_item_type TEXT NOT NULL DEFAULT 'Bug',
+                sprint_name TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                agent_name TEXT,
+                prompt TEXT,
                 response TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now'))
+                error TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                started_at TEXT,
+                finished_at TEXT
             )
         """)
         # 启用 WAL 模式：允许并发读取不阻塞写入，避免 Web 线程与后台采集线程之间的锁冲突
@@ -137,25 +147,92 @@ def diff_items(
     return new_items, continuing_items, disappeared_items
 
 
-# ── AI 修复建议存取 ──
+# ── AI 修复任务存取 ──
 
-def save_ai_fix(bug_id: int, bug_title: str, response: str):
-    """保存 AI 修复建议"""
+STATUS_PENDING = "pending"
+STATUS_RUNNING = "running"
+STATUS_COMPLETED = "completed"
+STATUS_FAILED = "failed"
+ALL_STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED]
+
+
+def create_fix_task(bug_id: int, bug_title: str, sprint_name: str = "",
+                    work_item_type: str = "Bug", prompt: str = "") -> int:
+    """创建修复任务，返回 task id"""
     with _connect() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO ai_fixes (bug_id, bug_title, response, updated_at) "
-            "VALUES (?, ?, ?, datetime('now'))",
-            (bug_id, bug_title, response),
+        cur = conn.execute(
+            "INSERT INTO fix_tasks (bug_id, bug_title, work_item_type, sprint_name, status, prompt) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (bug_id, bug_title, work_item_type, sprint_name, STATUS_PENDING, prompt),
         )
         conn.commit()
-    logger.debug("保存 AI 修复建议: Bug #%d - %s", bug_id, bug_title)
+        task_id = cur.lastrowid
+    logger.debug("创建修复任务 #%d: Bug #%d - %s", task_id, bug_id, bug_title)
+    return task_id
 
 
-def get_ai_fixes() -> list[dict]:
-    """获取所有已保存的 AI 修复建议"""
+def update_fix_task_status(task_id: int, status: str, **kwargs):
+    """更新任务状态和可选字段"""
+    allowed = {"status", "agent_name", "response", "error", "started_at", "finished_at"}
+    sets = ["status = ?"]
+    values: list = [status]
+    ts_now_args = set()
+    for k in kwargs:
+        if k in allowed:
+            if k == "started_at" and kwargs[k] == "now":
+                sets.append("started_at = datetime('now')")
+                ts_now_args.add("started_at")
+            elif k == "finished_at" and kwargs[k] == "now":
+                sets.append("finished_at = datetime('now')")
+                ts_now_args.add("finished_at")
+            elif k not in ts_now_args:
+                sets.append(f"{k} = ?")
+                values.append(kwargs[k])
+    values.append(task_id)
     with _connect() as conn:
-        rows = conn.execute("SELECT * FROM ai_fixes ORDER BY updated_at DESC").fetchall()
-        return [dict(r) for r in rows]
+        conn.execute(
+            f"UPDATE fix_tasks SET {', '.join(sets)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+    logger.debug("任务 #%d 状态更新: %s", task_id, status)
+
+
+def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = None) -> list[dict]:
+    """查询修复任务。status 可传单个字符串或列表，None 表示所有状态。"""
+    try:
+        with _connect() as conn:
+            query = "SELECT * FROM fix_tasks WHERE 1=1"
+            params: list = []
+            if status:
+                if isinstance(status, list):
+                    placeholders = ", ".join("?" for _ in status)
+                    query += f" AND status IN ({placeholders})"
+                    params.extend(status)
+                else:
+                    query += " AND status = ?"
+                    params.append(status)
+            if bug_id is not None:
+                query += " AND bug_id = ?"
+                params.append(bug_id)
+            query += " ORDER BY created_at DESC"
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def get_bug_fix_status_map() -> dict[int, dict]:
+    """返回 {bug_id: {status, task_id}}，取每个 bug 最新任务的状态"""
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT bug_id, id, status FROM fix_tasks "
+                "WHERE id IN (SELECT MAX(id) FROM fix_tasks GROUP BY bug_id)"
+            ).fetchall()
+            return {r["bug_id"]: {"status": r["status"], "task_id": r["id"]} for r in rows}
+    except Exception:
+        return {}
 
 
 # ── 历史快照浏览 ──

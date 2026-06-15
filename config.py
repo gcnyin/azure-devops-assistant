@@ -49,6 +49,12 @@ class Config:
         # AI 修复建议用的工作目录
         self.WORK_DIR: str = kwargs.get("WORK_DIR") or os.getenv("WORK_DIR", "")
 
+        # AI 修复超时（秒），默认 300（5分钟）
+        self.AI_FIX_TIMEOUT_SECONDS: int = int(
+            kwargs.get("AI_FIX_TIMEOUT_SECONDS")
+            or os.getenv("AI_FIX_TIMEOUT_SECONDS", "300")
+        )
+
         # ── 通知配置 ──
         notify_val = kwargs.get("NOTIFY_DESKTOP")
         if notify_val is None:
