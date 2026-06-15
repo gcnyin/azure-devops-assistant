@@ -27,8 +27,10 @@ export function DetailModal({ item, stateColors, onClose }: DetailModalProps) {
           </div>
         )}
         {item.description ? (
-          <div className="relative bg-canvas-soft border border-hairline rounded-lg p-6 whitespace-pre-wrap leading-relaxed text-ink-body text-sm mb-6 max-h-[300px] overflow-y-auto">
-            {item.description}
+          <div className="relative bg-canvas-soft border border-hairline rounded-lg mb-6">
+            <div className="whitespace-pre-wrap leading-relaxed text-ink-body text-sm p-6 max-h-[300px] overflow-y-auto">
+              {item.description}
+            </div>
             <button
               className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-canvas border border-hairline text-ink-muted hover:text-ink hover:border-hairline-soft transition-colors text-xs"
               title="Copy description"
