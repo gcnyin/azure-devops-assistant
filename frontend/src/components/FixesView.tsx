@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useFixes, useFixesMutation } from "@/hooks/useApi";
@@ -78,8 +82,31 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
           {fix.error || "Unknown error"}
         </div>
       ) : (
-        <div className="bg-surface-dark text-on-dark rounded-lg p-4 mt-3 whitespace-pre-wrap font-mono text-sm leading-relaxed max-h-[480px] overflow-y-auto">
-          {fix.response || ""}
+        <div className="bg-canvas rounded-lg p-4 mt-3 max-h-[480px] overflow-y-auto">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              code({ node, className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || "");
+                const inline = !match;
+                return !inline ? (
+                  <SyntaxHighlighter
+                    style={oneLight}
+                    language={match[1]}
+                    PreTag="div"
+                  >
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
+            {fix.response || ""}
+          </ReactMarkdown>
         </div>
       )}
       {(status === "completed" || status === "failed") && (
