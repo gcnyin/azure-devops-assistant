@@ -344,6 +344,63 @@ class AzureDevOpsClient:
 
         return result
 
+    # ------------------------------------------------------------------
+    # Pull Request
+    # ------------------------------------------------------------------
+
+    def create_pull_request(
+        self,
+        repo_name: str,
+        source_branch: str,
+        target_branch: str = "develop",
+        title: str = "",
+        description: str = "",
+    ) -> str:
+        """创建 Pull Request，返回 PR 的 HTML URL"""
+        url = (
+            f"{self.config.base_url()}"
+            f"/{quote(self.config.PROJECT, safe='')}"
+            f"/_apis/git/repositories/{quote(repo_name, safe='')}/pullrequests"
+        )
+        body = {
+            "sourceRefName": f"refs/heads/{source_branch}",
+            "targetRefName": f"refs/heads/{target_branch}",
+            "title": title,
+            "description": description,
+        }
+        resp = self._request("POST", url, json=body, params={"api-version": "7.1"})
+
+        if resp.status_code == 409:
+            # PR 已存在，尝试查找已有 PR
+            logger.info("PR 已存在 (409)，查找已有 PR: %s -> %s", source_branch, target_branch)
+            search_url = (
+                f"{self.config.base_url()}"
+                f"/{quote(self.config.PROJECT, safe='')}"
+                f"/_apis/git/repositories/{quote(repo_name, safe='')}/pullrequests"
+            )
+            search_resp = self._request(
+                "GET", search_url,
+                params={
+                    "searchCriteria.sourceRefName": f"refs/heads/{source_branch}",
+                    "searchCriteria.status": "active",
+                    "api-version": "7.1",
+                },
+            )
+            if search_resp.status_code == 200:
+                values = search_resp.json().get("value", [])
+                if values:
+                    existing = values[0].get("_links", {}).get("html", {}).get("href", "")
+                    logger.info("找到已有 PR: %s", existing)
+                    return existing
+            logger.warning("未找到已有 PR")
+            return ""
+
+        resp.raise_for_status()
+        pr_data = resp.json()
+        pr_url = pr_data.get("_links", {}).get("html", {}).get("href", "")
+        logger.info("PR 创建成功: %s", pr_url)
+        return pr_url
+
     def _get_work_items_batch(self, ids: list[int]) -> dict[int, dict]:
         """批量获取 Work Item 详情（最多 200 个/次）"""
         if not ids:

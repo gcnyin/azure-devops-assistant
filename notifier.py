@@ -159,6 +159,13 @@ def notify_changes(
         _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
 
 
+def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int):
+    """PR 创建成功时发送桌面通知"""
+    title = f"[AI Fix] PR Created - AB#{bug_id}"
+    body = f"{repo_name}: {bug.get('title', 'N/A')[:60]}"
+    _send_desktop(title, body)
+
+
 def notify_fix_tasks_completed(completed: int, failed: int, total: int, config: Config):
     """修复任务批次完成时发送桌面通知"""
     if not config.NOTIFY_DESKTOP:

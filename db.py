@@ -34,6 +34,14 @@ def init_db():
         """)
         # 删除旧 ai_fixes 表（schema 已重新设计）
         conn.execute("DROP TABLE IF EXISTS ai_fixes")
+        # 尝试添加新列（如果表已存在但缺字段）
+        for col, col_def in [
+            ("repo_results", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE fix_tasks ADD COLUMN {col} {col_def}")
+            except Exception:
+                pass  # 列已存在
         conn.execute("""
             CREATE TABLE IF NOT EXISTS fix_tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +54,7 @@ def init_db():
                 prompt TEXT,
                 response TEXT,
                 error TEXT,
+                repo_results TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 started_at TEXT,
                 finished_at TEXT
@@ -173,7 +182,7 @@ def create_fix_task(bug_id: int, bug_title: str, sprint_name: str = "",
 
 def update_fix_task_status(task_id: int, status: str, **kwargs):
     """更新任务状态和可选字段"""
-    allowed = {"status", "agent_name", "response", "error", "started_at", "finished_at"}
+    allowed = {"status", "agent_name", "response", "error", "started_at", "finished_at", "repo_results"}
     sets = ["status = ?"]
     values: list = [status]
     ts_now_args = set()

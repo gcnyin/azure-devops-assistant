@@ -41,7 +41,16 @@ export function useFixes(status?: string, bugId?: number) {
   const qs = params.toString();
   return useQuery<FixItem[]>({
     queryKey: ["fixes", status, bugId],
-    queryFn: () => fetchJson(`/api/fixes${qs ? `?${qs}` : ""}`),
+    queryFn: () =>
+      fetchJson<FixItem[]>(`/api/fixes${qs ? `?${qs}` : ""}`).then((items) =>
+        items.map((item) => ({
+          ...item,
+          repo_results:
+            typeof item.repo_results === "string"
+              ? JSON.parse(item.repo_results)
+              : item.repo_results,
+        }))
+      ),
     refetchInterval: 15_000,
   });
 }

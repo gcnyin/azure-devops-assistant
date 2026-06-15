@@ -8,7 +8,7 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useFixes, useFixesMutation } from "@/hooks/useApi";
-import type { FixItem } from "@/types/api";
+import type { FixItem, FixRepoResult } from "@/types/api";
 
 const STATUSES = ["all", "pending", "running", "completed", "failed"] as const;
 type FixStatus = (typeof STATUSES)[number];
@@ -48,6 +48,58 @@ function getDuration(started: string | null, finished: string | null): string {
   return rem > 0 ? `${min}m ${rem}s` : `${min}m`;
 }
 
+function RepoResults({
+  repoResults,
+}: {
+  repoResults: FixRepoResult[];
+}) {
+  return (
+    <div className="mt-3 space-y-2">
+      {repoResults.map((rr, i) => (
+        <div
+          key={i}
+          className="bg-surface-card rounded-lg p-3 text-[13px]"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-ink-strong">
+              {rr.repo_name || rr.path}
+            </span>
+            {rr.branch && (
+              <span className="text-ink-muted text-xs font-mono">
+                {rr.branch}
+              </span>
+            )}
+          </div>
+          {rr.pr_url ? (
+            <a
+              href={rr.pr_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-1 text-primary text-xs hover:underline"
+            >
+              View PR &rarr;
+            </a>
+          ) : (
+            <span className="inline-block mt-1 text-ink-muted text-xs">
+              {rr.push_error || rr.pr_error || "PR not created"}
+            </span>
+          )}
+          {rr.files_modified && rr.files_modified.length > 0 && (
+            <div className="mt-1 text-ink-soft text-[11px] font-mono">
+              {rr.files_modified.slice(0, 5).map((f, j) => (
+                <div key={j}>{f}</div>
+              ))}
+              {rr.files_modified.length > 5 && (
+                <div>... 共 {rr.files_modified.length} 个文件</div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => void }) {
   const status = fix.status;
   const dot = STATUS_DOT[status] || "bg-ink-soft/20";
@@ -82,7 +134,7 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
           {fix.error || "Unknown error"}
         </div>
       ) : (
-        <div className="bg-canvas rounded-lg p-4 mt-3 max-h-[480px] overflow-y-auto">
+        <div className="prose prose-base max-w-none bg-canvas rounded-lg p-4 mt-3 max-h-[480px] overflow-y-auto">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
@@ -103,13 +155,23 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
                   </code>
                 );
               },
+              a({ node, children, ...props }) {
+                return (
+                  <a target="_blank" rel="noopener noreferrer" {...props}>
+                    {children}
+                  </a>
+                );
+              },
             }}
           >
             {fix.response || ""}
           </ReactMarkdown>
+          {fix.repo_results && fix.repo_results.length > 0 && (
+            <RepoResults repoResults={fix.repo_results} />
+          )}
         </div>
       )}
-      {(status === "completed" || status === "failed") && (
+      {!fix.repo_results?.length && (status === "completed" || status === "failed") && (
         <div className="mt-3 flex justify-end">
           <Button variant="ghost" size="sm" className="text-xs"
             onClick={() => onRetry(fix.bug_id)} disabled={retrying}>

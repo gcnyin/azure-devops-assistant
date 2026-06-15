@@ -41,6 +41,17 @@ export interface BoardData {
   view_mode: "all" | "me";
 }
 
+export interface FixRepoResult {
+  path: string;
+  commit_sha?: string;
+  files_modified?: string[];
+  branch?: string;
+  pr_url?: string | null;
+  repo_name?: string;
+  push_error?: string;
+  pr_error?: string;
+}
+
 export interface FixItem {
   id: number;
   bug_id: number;
@@ -52,6 +63,7 @@ export interface FixItem {
   prompt: string | null;
   response: string | null;
   error: string | null;
+  repo_results: FixRepoResult[] | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

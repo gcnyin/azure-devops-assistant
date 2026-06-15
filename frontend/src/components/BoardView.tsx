@@ -123,7 +123,13 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
             <Button variant={stateFilter === "bug" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
               onClick={() => updateParam("state", "bug")}>Bug <span className="text-ink-soft ml-1 text-xs">{bugCount}</span></Button>
           )}
-          {Object.entries(stateMap).sort(([a], [b]) => a.localeCompare(b)).map(([st, cnt]) => (
+          {Object.entries(stateMap)
+            .filter(([st]) => {
+              const lower = st.toLowerCase();
+              return lower !== "open" && lower !== "done" && lower !== "bug" && lower !== "all";
+            })
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([st, cnt]) => (
             <Button key={st} variant={stateFilter === st.toLowerCase() ? "secondary" : "ghost"} size="sm" className="rounded-lg"
               onClick={() => updateParam("state", st.toLowerCase())}>{st} <span className="text-ink-soft ml-1 text-xs">{cnt}</span></Button>
           ))}
