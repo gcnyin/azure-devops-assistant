@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from web import app, update_cached_data, get_cached_data, set_web_query_states
+from web import app, update_cached_data, get_cached_data, set_web_query_states, set_web_access_token
 
 
 @pytest.fixture
@@ -591,3 +591,148 @@ class TestApiFixesRunRoute:
         data = resp.get_json()
         assert data["ok"] is False
         assert "error" in data
+
+
+class TestApiFixesCancelRoute:
+    """POST /api/fixes/<task_id>/cancel 路由测试"""
+
+    def test_cancel_existing_pending_task(self, client):
+        from db import init_db, create_fix_task
+        init_db()
+        tid = create_fix_task(400, "Bug to Cancel", sprint_name="Sprint 1")
+        resp = client.post(f"/api/fixes/{tid}/cancel")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["task_id"] == tid
+        assert "cancelled" in data["message"].lower()
+
+    def test_cancel_nonexistent_task_returns_404(self, client):
+        resp = client.post("/api/fixes/99999/cancel")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "not found" in data["message"].lower()
+
+    def test_cancel_completed_task_returns_404(self, client):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(401, "Already Done")
+        update_fix_task_status(tid, "completed", response="done", finished_at="now")
+        resp = client.post(f"/api/fixes/{tid}/cancel")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert data["ok"] is False
+
+    def test_cancel_with_auth_required(self, client):
+        set_web_access_token("secret123")
+        resp = client.post("/api/fixes/1/cancel")
+        assert resp.status_code == 401
+
+    def test_cancel_with_correct_token(self, client):
+        from db import init_db, create_fix_task
+        init_db()
+        tid = create_fix_task(402, "Bug with Auth", sprint_name="Sprint 1")
+        set_web_access_token("secret123")
+        resp = client.post(
+            f"/api/fixes/{tid}/cancel",
+            headers={"Authorization": "Bearer secret123"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        set_web_access_token("")
+
+
+class TestAccessTokenAuth:
+    """WEB_ACCESS_TOKEN 认证中间件测试"""
+
+    def test_no_token_configured_allows_all_routes(self, client):
+        """未配置 token 时所有路由正常访问"""
+        set_web_access_token("")
+        resp = client.get("/api/data")
+        assert resp.status_code == 200
+        resp = client.get("/api/fixes")
+        assert resp.status_code == 200
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+
+    def test_health_always_allowed(self, client):
+        """/health 路由始终不需要认证"""
+        set_web_access_token("secret123")
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "status" in data
+
+    def test_missing_auth_header_returns_401(self, client):
+        """未提供 Authorization 请求头返回 401"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/data")
+        assert resp.status_code == 401
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_invalid_auth_scheme_returns_401(self, client):
+        """非 Bearer 认证方案返回 401"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/data", headers={"Authorization": "Basic YWxhZGRpbjpvcGVuc2VzYW1l"})
+        assert resp.status_code == 401
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_wrong_token_returns_401(self, client):
+        """错误的 token 返回 401"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/data", headers={"Authorization": "Bearer wrongtoken"})
+        assert resp.status_code == 401
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_correct_token_allows_access(self, client):
+        """正确的 token 允许访问"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/data", headers={"Authorization": "Bearer secret123"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "items" in data
+
+    def test_correct_token_allows_post(self, client):
+        """正确的 token 允许 POST 请求"""
+        set_web_access_token("secret123")
+        resp = client.post(
+            "/api/fixes/run",
+            json={"bug_ids": []},
+            headers={"Authorization": "Bearer secret123"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+
+    def test_auth_applies_to_non_api_routes(self, client):
+        """认证也适用于非 API 路由（如首页）"""
+        set_web_access_token("secret123")
+        resp = client.get("/")
+        assert resp.status_code == 401
+
+    def test_auth_applies_to_history_diff_route(self, client):
+        """认证适用于 /api/history/diff 路由"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/history/diff/1/2")
+        assert resp.status_code == 401
+
+    def test_auth_applies_to_export_route(self, client):
+        """认证适用于 /api/export 路由"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/export?format=csv")
+        assert resp.status_code == 401
+
+    def test_token_cleared_restores_open_access(self, client):
+        """清除 token 后恢复公开访问"""
+        set_web_access_token("secret123")
+        resp = client.get("/api/data")
+        assert resp.status_code == 401
+
+        set_web_access_token("")
+        resp = client.get("/api/data")
+        assert resp.status_code == 200

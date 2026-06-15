@@ -16,7 +16,7 @@ from flask import Flask, jsonify, request, Response, send_file
 from renderer import STATE_COLORS_HEX
 from db import (
     list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
-    get_fix_tasks, get_bug_fix_status_map, ALL_STATUSES,
+    get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
 )
 from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, set_timeout as ai_set_timeout, add_finish_callback
 from notifier import notify_fix_tasks_completed
@@ -44,6 +44,9 @@ _expected_query_states: list[str] = ["To Do", "In Progress", "Active", "New", "C
 # ── AI fix working directory (set by main.py at startup) ──
 _work_dir: str = "."
 
+# ── Web access token (set by main.py at startup) ──
+_access_token: str = ""
+
 
 def set_web_work_dir(work_dir: str):
     global _work_dir
@@ -54,6 +57,11 @@ def set_web_work_dir(work_dir: str):
 def set_web_query_states(states: list[str]):
     global _expected_query_states
     _expected_query_states = list(states)
+
+
+def set_web_access_token(token: str):
+    global _access_token
+    _access_token = token or ""
 
 
 # ── Flask App ──
@@ -87,6 +95,24 @@ def update_cached_data(
 def get_cached_data() -> dict:
     with _data_lock:
         return copy.deepcopy(_cached_data)
+
+
+# ── Auth Middleware ──
+
+@app.before_request
+def _check_access_token():
+    """对所有非 /health 路由检查 Authorization: Bearer <token>（若已配置）"""
+    if request.endpoint == "health":
+        return None
+    if not _access_token:
+        return None
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid Authorization header"}), 401
+    token = auth_header[7:]
+    if token != _access_token:
+        return jsonify({"error": "Invalid access token"}), 401
+    return None
 
 
 # ── API Routes ──
@@ -207,6 +233,19 @@ def api_fixes_run():
     except Exception as e:
         logger.error("AI fix task creation failed: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/fixes/<int:task_id>/cancel", methods=["POST"])
+def api_fixes_cancel(task_id: int):
+    cancelled = cancel_fix_task(task_id)
+    if cancelled:
+        return jsonify({"ok": True, "task_id": task_id, "message": f"Task #{task_id} cancelled"})
+    else:
+        return jsonify({
+            "ok": False,
+            "task_id": task_id,
+            "message": f"Task #{task_id} not found or already in a final state",
+        }), 404
 
 
 @app.route("/api/history")

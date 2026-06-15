@@ -2,6 +2,8 @@
 AI 修复模块测试：验证 prompt 构造、agent 调用和 Bug 处理流程
 """
 import subprocess
+import threading
+import time
 
 import pytest
 
@@ -282,6 +284,25 @@ class TestEnqueueFixTasks:
 
         call_kwargs = mock_create.call_args[1]
         assert call_kwargs["sprint_name"] == "My Sprint"
+
+    def test_worker_skips_cancelled_task(self, mocker):
+        """worker 循环跳过已被取消的任务"""
+        from ai_fix import _worker_loop, _task_queue
+
+        mock_get = mocker.patch("db.get_fix_tasks", return_value=[{"id": 1, "status": "cancelled"}])
+        mock_process = mocker.patch("ai_fix._process_one")
+
+        bug = {"id": 999, "title": "Cancelled Bug"}
+        _task_queue.put((1, bug, "test prompt"))
+
+        # 在后台线程运行 worker
+        t = threading.Thread(target=_worker_loop, daemon=True)
+        t.start()
+        # 等待 worker 处理并跳过后阻塞
+        time.sleep(0.3)
+
+        # _process_one 不应被调用
+        mock_process.assert_not_called()
 
     def test_prompt_generated_for_each_bug(self, mocker):
         """每个 Bug 生成独立 prompt"""

@@ -162,7 +162,9 @@ STATUS_PENDING = "pending"
 STATUS_RUNNING = "running"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
-ALL_STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED]
+STATUS_CANCELLED = "cancelled"
+ALL_STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED]
+CANCELLABLE_STATUSES = [STATUS_PENDING, STATUS_RUNNING]
 
 
 def create_fix_task(bug_id: int, bug_title: str, sprint_name: str = "",
@@ -229,6 +231,27 @@ def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = No
             return [dict(r) for r in rows]
     except Exception:
         return []
+
+
+def cancel_fix_task(task_id: int) -> bool:
+    """取消修复任务。仅 pending/running 状态可取消。返回 True 表示成功取消。"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT status FROM fix_tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+        if not row:
+            logger.debug("取消任务 #%d: 不存在", task_id)
+            return False
+        if row["status"] not in CANCELLABLE_STATUSES:
+            logger.debug("取消任务 #%d: 当前状态=%s 不可取消", task_id, row["status"])
+            return False
+        conn.execute(
+            "UPDATE fix_tasks SET status = ?, finished_at = datetime('now') WHERE id = ?",
+            (STATUS_CANCELLED, task_id),
+        )
+        conn.commit()
+    logger.info("任务 #%d 已取消", task_id)
+    return True
 
 
 def get_bug_fix_status_map() -> dict[int, dict]:

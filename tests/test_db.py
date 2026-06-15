@@ -248,6 +248,47 @@ class TestDbCRUD:
         status_map = self.db.get_bug_fix_status_map()
         assert status_map[200]["status"] == "running"
 
+    def test_cancel_fix_task_pending(self):
+        """取消 pending 状态的任务"""
+        tid = self.db.create_fix_task(300, "Cancel Me")
+        assert self.db.cancel_fix_task(tid) is True
+        tasks = self.db.get_fix_tasks(bug_id=300)
+        found = [t for t in tasks if t["id"] == tid]
+        assert len(found) == 1
+        assert found[0]["status"] == "cancelled"
+        assert found[0]["finished_at"] is not None
+
+    def test_cancel_fix_task_running(self):
+        """取消 running 状态的任务"""
+        tid = self.db.create_fix_task(301, "Cancel Running")
+        self.db.update_fix_task_status(tid, "running", started_at="now")
+        assert self.db.cancel_fix_task(tid) is True
+        tasks = self.db.get_fix_tasks(bug_id=301)
+        found = [t for t in tasks if t["id"] == tid]
+        assert found[0]["status"] == "cancelled"
+
+    def test_cancel_fix_task_completed_fails(self):
+        """completed 状态的任务不可取消"""
+        tid = self.db.create_fix_task(302, "Already Done")
+        self.db.update_fix_task_status(tid, "completed", response="done", finished_at="now")
+        assert self.db.cancel_fix_task(tid) is False
+        tasks = self.db.get_fix_tasks(bug_id=302)
+        found = [t for t in tasks if t["id"] == tid]
+        assert found[0]["status"] == "completed"
+
+    def test_cancel_fix_task_failed_fails(self):
+        """failed 状态的任务不可取消"""
+        tid = self.db.create_fix_task(303, "Already Failed")
+        self.db.update_fix_task_status(tid, "failed", error="timeout", finished_at="now")
+        assert self.db.cancel_fix_task(tid) is False
+        tasks = self.db.get_fix_tasks(bug_id=303)
+        found = [t for t in tasks if t["id"] == tid]
+        assert found[0]["status"] == "failed"
+
+    def test_cancel_fix_task_nonexistent(self):
+        """不存在的任务返回 False"""
+        assert self.db.cancel_fix_task(99999) is False
+
     def test_list_snapshots_filtered(self):
         """按 sprint_name 过滤列出快照"""
         self.db.save_snapshot("Sprint 1", "TeamA", [_make_item(1)])
