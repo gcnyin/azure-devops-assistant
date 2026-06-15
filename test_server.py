@@ -3,7 +3,7 @@ from typing import Any
 
 from web import app, update_cached_data, set_web_query_states, run_web_server
 from utils import setup_logging
-from db import init_db, save_ai_fix
+from db import init_db, create_fix_task, update_fix_task_status
 
 setup_logging()
 set_web_query_states(["To Do", "In Progress", "Active", "New", "Committed"])
@@ -61,7 +61,8 @@ fix_response = """[agent: pi]
     + .login-form { margin-top: 10vh; display: flex; align-items: center; }
 
 建议修改后运行测试确保登录流程正常。"""
-save_ai_fix(12345, '登录页面样式错乱', fix_response)
+task_id = create_fix_task(12345, '登录页面样式错乱', sprint_name='Sprint 26', work_item_type='Bug', prompt='')
+update_fix_task_status(task_id, 'completed', response=fix_response, agent_name='pi', started_at='now', finished_at='now')
 
 port: int = 8080
 print(f"测试数据已就绪，启动服务器 http://localhost:{port} ...")
