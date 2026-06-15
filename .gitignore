@@ -23,6 +23,10 @@ env/
 # ── Node / Tailwind CSS ──
 node_modules/
 
+# ── 前端构建产物 ──
+static/
+frontend/tsconfig.tsbuildinfo
+
 # ── OS ──
 .DS_Store
 Thumbs.db
