@@ -107,4 +107,15 @@ export interface AppConfig {
   state_colors: Record<string, string>;
 }
 
+export interface SprintSummary {
+  sprint_name: string;
+  team_name: string;
+  snapshot_count: number;
+}
+
+export interface SprintsResponse {
+  sprints: SprintSummary[];
+  current_sprint: string;
+}
+
 export type DiffFilterType = "new" | "changed" | "gone";

@@ -816,3 +816,116 @@ class TestAccessTokenAuth:
         set_web_access_token("")
         resp = client.get("/api/data")
         assert resp.status_code == 200
+
+
+class TestApiSprintsRoute:
+    """GET /api/sprints 路由测试"""
+
+    def test_returns_200(self, client):
+        resp = client.get("/api/sprints")
+        assert resp.status_code == 200
+
+    def test_returns_json_with_sprints_and_current(self, client):
+        resp = client.get("/api/sprints")
+        data = resp.get_json()
+        assert "sprints" in data
+        assert "current_sprint" in data
+        assert isinstance(data["sprints"], list)
+
+    def test_includes_current_sprint_when_no_snapshots(self, client):
+        update_cached_data(
+            iteration={"name": "My Current Sprint"},
+            items=[], diff_info=None,
+            team_name="MyTeam", project="MyProject",
+        )
+        resp = client.get("/api/sprints")
+        data = resp.get_json()
+        assert data["current_sprint"] == "My Current Sprint"
+        sprints = data["sprints"]
+        assert any(s["sprint_name"] == "My Current Sprint" for s in sprints)
+
+    def test_includes_sprints_from_db(self, client):
+        from db import init_db, save_snapshot
+        init_db()
+        save_snapshot("Sprint 10", "TeamA", [{"id": 1, "title": "X", "state": "To Do", "type": "Bug", "assignedTo": "T"}])
+        save_snapshot("Sprint 20", "TeamA", [{"id": 2, "title": "Y", "state": "Done", "type": "Task", "assignedTo": "T"}])
+        resp = client.get("/api/sprints")
+        data = resp.get_json()
+        sprints = data["sprints"]
+        names = {s["sprint_name"] for s in sprints}
+        assert "Sprint 10" in names
+        assert "Sprint 20" in names
+
+    def test_no_duplicate_sprints(self, client):
+        from db import init_db, save_snapshot
+        init_db()
+        save_snapshot("Sprint Dup", "TeamA", [{"id": 1, "title": "A", "state": "To Do", "type": "Bug", "assignedTo": "T"}])
+        # 设置当前 Sprint 与已保存的相同
+        update_cached_data(
+            iteration={"name": "Sprint Dup"},
+            items=[], diff_info=None,
+            team_name="TeamA", project="P",
+        )
+        resp = client.get("/api/sprints")
+        data = resp.get_json()
+        count = sum(1 for s in data["sprints"] if s["sprint_name"] == "Sprint Dup")
+        assert count == 1
+
+
+class TestApiDataWithSprintParam:
+    """GET /api/data?sprint=xxx 路由测试"""
+
+    def test_returns_current_data_when_no_sprint_param(self, client, sample_data):
+        resp = client.get("/api/data")
+        data = resp.get_json()
+        assert data["iteration"]["name"] == "Sprint 1"
+
+    def test_returns_current_data_when_sprint_matches(self, client, sample_data):
+        resp = client.get("/api/data?sprint=Sprint 1")
+        data = resp.get_json()
+        assert data["iteration"]["name"] == "Sprint 1"
+        assert data["offline"] is False
+
+    def test_returns_404_for_unknown_sprint(self, client, sample_data):
+        resp = client.get("/api/data?sprint=NonExistentSprint")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_returns_snapshot_data_for_historical_sprint(self, client, sample_data):
+        from db import init_db, save_snapshot
+        init_db()
+        items = [
+            {"id": 42, "title": "Old Item", "state": "Closed", "type": "Bug", "assignedTo": "OldUser", "htmlUrl": "http://example.com/42"},
+        ]
+        save_snapshot("Old Sprint", "DevTeam", items)
+        resp = client.get("/api/data?sprint=Old Sprint")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["iteration"]["name"] == "Old Sprint"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == 42
+        assert data["items"][0]["title"] == "Old Item"
+        assert data["diff_info"] is None
+        assert data["team_name"] == "DevTeam"
+
+    def test_snapshot_data_has_correct_structure(self, client, sample_data):
+        from db import init_db, save_snapshot
+        init_db()
+        save_snapshot("History Sprint", "MyTeam", [
+            {"id": 1, "title": "Item", "state": "New", "type": "Task", "assignedTo": "User"},
+        ])
+        resp = client.get("/api/data?sprint=History Sprint")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        # 确认 BoardData 结构完整
+        assert "iteration" in data
+        assert "items" in data
+        assert "diff_info" in data
+        assert "last_update" in data
+        assert "assigned_to" in data
+        assert "team_name" in data
+        assert "project" in data
+        assert "offline" in data
+        assert "error" in data
+        assert "view_mode" in data

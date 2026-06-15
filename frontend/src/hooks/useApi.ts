@@ -6,6 +6,7 @@ import type {
   SnapshotDetail,
   DiffSnapshotData,
   AppConfig,
+  SprintsResponse,
 } from "@/types/api";
 
 const API_BASE = "";
@@ -26,11 +27,23 @@ export function useConfig() {
   });
 }
 
-export function useBoardData(view: string) {
+export function useBoardData(view: string, sprintName?: string) {
+  const params = new URLSearchParams();
+  params.set("view", view);
+  if (sprintName) params.set("sprint", sprintName);
+  const qs = params.toString();
   return useQuery<BoardData>({
-    queryKey: ["board", view],
-    queryFn: () => fetchJson(`/api/data?view=${view}`),
-    refetchInterval: 60_000,
+    queryKey: ["board", view, sprintName || ""],
+    queryFn: () => fetchJson(`/api/data?${qs}`),
+    refetchInterval: sprintName ? 0 : 60_000,
+  });
+}
+
+export function useSprints() {
+  return useQuery<SprintsResponse>({
+    queryKey: ["sprints"],
+    queryFn: () => fetchJson("/api/sprints"),
+    staleTime: 30_000,
   });
 }
 

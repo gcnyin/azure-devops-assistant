@@ -157,9 +157,95 @@ def api_config():
     })
 
 
+@app.route("/api/sprints")
+def api_sprints():
+    """返回所有 Sprint 名称列表，供下拉选择器使用。"""
+    try:
+        from db import _connect
+        import json as _json
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT sprint_name, team_name, MAX(id) as latest_id, COUNT(*) as snapshot_count "
+                "FROM sprint_snapshot "
+                "GROUP BY sprint_name, team_name "
+                "ORDER BY latest_id DESC"
+            ).fetchall()
+            sprints = []
+            for r in rows:
+                sprints.append({
+                    "sprint_name": r["sprint_name"],
+                    "team_name": r["team_name"],
+                    "snapshot_count": r["snapshot_count"],
+                })
+            # 同时加入当前活跃 Sprint（如果不在历史中）
+            current_data = get_cached_data()
+            current_sprint = current_data.get("iteration", {}).get("name", "")
+            current_team = current_data.get("team_name", "")
+            if current_sprint and not any(
+                s["sprint_name"] == current_sprint and s["team_name"] == current_team
+                for s in sprints
+            ):
+                sprints.insert(0, {
+                    "sprint_name": current_sprint,
+                    "team_name": current_team,
+                    "snapshot_count": 0,
+                })
+            return jsonify({"sprints": sprints, "current_sprint": current_sprint})
+    except Exception as e:
+        logger.error("Failed to load sprints: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+def _build_board_from_snapshot(sprint_name: str) -> dict | None:
+    """从最新快照构建 BoardData 格式。"""
+    from db import _connect
+    import json as _json
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM sprint_snapshot WHERE sprint_name = ? ORDER BY id DESC LIMIT 1",
+            (sprint_name,),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            items = _json.loads(row["work_items_json"])
+        except (_json.JSONDecodeError, TypeError):
+            items = []
+        return {
+            "iteration": {
+                "id": "",
+                "name": row["sprint_name"],
+                "path": "",
+                "startDate": "",
+                "finishDate": "",
+            },
+            "items": items,
+            "diff_info": None,
+            "last_update": row["fetched_at"],
+            "assigned_to": "",
+            "team_name": row["team_name"],
+            "project": "",
+            "offline": False,
+            "error": "",
+            "view_mode": "all",
+        }
+
+
 @app.route("/api/data")
 def api_data():
-    data = get_cached_data()
+    sprint_name = request.args.get("sprint", "")
+    current_data = get_cached_data()
+    current_sprint = current_data.get("iteration", {}).get("name", "")
+
+    # 如果请求了不同的 Sprint，从快照加载
+    if sprint_name and sprint_name != current_sprint:
+        snapshot_data = _build_board_from_snapshot(sprint_name)
+        if snapshot_data is None:
+            return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
+        data = snapshot_data
+    else:
+        data = current_data
+
     view_mode = request.args.get("view", "all")
     items = data["items"]
     diff_info = data["diff_info"]
