@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  sprint-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: azure-devops-sprint-monitor:latest
+    container_name: sprint-monitor
+    restart: unless-stopped
+
+    ports:
+      # Web UI 端口映射，可按需修改宿主机端口（如 "3000:8080"）
+      - "8080:8080"
+
+    # 环境变量：通过 .env 文件或直接在此处配置
+    env_file:
+      - .env
+
+    # 可选：直接通过 environment 覆盖 .env 中的值
+    environment:
+      # Web 端口（容器内），默认 8080
+      - WEB_PORT=8080
+      # 是否绑定 0.0.0.0 允许外部访问（容器内必须为 true）
+      - BIND_PUBLIC=true
+      # 额外启动参数（如 --ai-fix）
+      # - EXTRA_ARGS=--ai-fix
+
+    volumes:
+      # 数据持久化目录（包含 SQLite 数据库），重启不丢失数据
+      - ./data:/app/data
+      # 日志持久化
+      - ./logs:/app/logs
+      # 可选：挂载代码仓库以启用 AI 修复建议（需配合 EXTRA_ARGS=--ai-fix）
+      # - /path/to/your/code/repo:/workspace:ro

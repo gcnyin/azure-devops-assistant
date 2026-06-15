@@ -1,6 +1,6 @@
 # Azure DevOps Sprint 看板监控
 
-定时从 Azure DevOps 获取当前 Sprint 中的 Work Items，在终端和 Web 界面展示，支持增量对比、个人视图、AI 修复建议、通知系统和文件导出。
+定时从 Azure DevOps 获取当前 Sprint 中的 Work Items，在 Web 界面展示，支持增量对比、个人视图、AI 修复建议和通知系统。
 
 ## 功能
 
@@ -8,12 +8,9 @@
 - **Team 自动发现** -- 未配置 Team 时，自动扫描项目下所有团队，选择 Sprint 覆盖今天的 Team
 - **WIQL 灵活查询** -- 支持自定义状态筛选（Scrum / Agile / CMMI 多模板兼容）
 - **增量差异对比** -- 每次拉取与上次快照对比，标记 **新增**、**状态变化**、**消失** 的卡片
-- **默认个人视图** -- 默认自动识别当前用户，只保存和展示自己的卡片；`--all` 查看全部
+- **默认个人视图** -- 始终自动识别当前用户，只展示自己的卡片
 - **AI 修复建议** -- `--ai-fix` 发现新 Bug 时自动调用 AI agent（pi / claude / opencode / codex）生成修复方案
-- **详情展示** -- 自动打印 Work Item 的描述内容（去掉 HTML 标签）
 - **SQLite 持久化** -- 每次快照存入本地数据库，支持历史回溯
-- **多格式导出** -- 支持导出为 `.csv`、`.md`、`.txt`
-- **Rich 终端渲染** -- 彩色表格展示，带增量标记（新增/状态变化）和状态分布统计
 - **Web 看板** -- 内置 Flask Web 界面，浏览器中查看 Sprint 看板、AI 修复建议、历史快照
 - **桌面通知** -- 检测到变化时发送系统桌面通知（Linux / macOS / Windows）
 - **Webhook 通知** -- 支持 Slack / Teams 兼容的 Webhook 通知
@@ -25,17 +22,24 @@
 ## 架构
 
 ```
-main.py           入口，命令行解析、调度循环、Web/终端双模式
+main.py           入口，命令行解析、调度循环、Web 模式
 azure_devops.py   Azure DevOps REST API 客户端（WIQL 查询、批量详情、Team 发现）
 config.py         配置管理（.env 加载、默认值）
 db.py             SQLite 持久化（快照存取、差异对比、历史浏览）
 ai_fix.py         AI 修复建议（构造 prompt → 调 agent → 存结果）
-renderer.py       Rich 终端渲染（表格、状态颜色、文件导出）
+renderer.py       状态颜色常量（供 Web UI 使用）
 notifier.py       通知模块（桌面通知 + Slack/Teams Webhook）
 web.py            Flask Web 服务器（API 路由、数据缓存）
 utils.py          工具函数（端口自动发现、日志配置）
-static/           Web 前端静态资源（app.js, style.css）
-templates/        Jinja2 模板（index.html）
+styles/           Tailwind CSS v4 源文件
+  app.css          主题令牌、CSS 变量桥接、组件类
+static/           Web 前端静态资源
+  app.js            主逻辑
+  components.css    JS 动态组件样式（兼容层）
+  tailwind.css      Tailwind 构建产物
+templates/        Jinja2 模板
+  index.html        Sprint 看板主页面
+  login.html        访问 Token 登录页
 ```
 
 ## 快速开始
@@ -43,7 +47,11 @@ templates/        Jinja2 模板（index.html）
 ### 1. 安装依赖
 
 ```bash
+# Python 依赖
 pip install -r requirements.txt
+
+# 前端依赖（仅开发/构建时需要，tailwind.css 已预构建在仓库中）
+npm install
 ```
 
 ### 2. 配置
@@ -85,41 +93,14 @@ WORK_DIR=/path/to/your/code/repo
 ### 3. 使用
 
 ```bash
-# 单次查询（默认只显示你自己的卡片）
-python main.py --once
-
-# 查看所有人的卡片
-python main.py --once --all
-
-# 定时监控（按配置间隔刷新，默认个人模式）
+# 定时监控（自动识别当前用户，按配置间隔刷新，自动启动 Web UI）
 python main.py
-
-# 定时监控 + 查看全部
-python main.py --all
 
 # 自定义刷新间隔（分钟）
 python main.py --interval 5
 
-# 查看指定用户的卡片
-python main.py --once --me "张三"
-
-# 仅显示变化（新增 + 状态变化 + 消失），无变化时只打一行
-python main.py --once --changes-only
-python main.py --changes-only          # 定时模式，安静监控
-
-# 导出结果到文件
-python main.py --once --output report.csv
-python main.py --once --output sprint.md
-
-# 输出文件名支持 {now} 占位符，自动替换为时间戳（适合定时存档）
-python main.py --output "report_{now}.csv"
-
 # 发现新 Bug 时调用 AI agent 生成修复建议
-python main.py --once --ai-fix
-python main.py --me --ai-fix
-
-# 禁用 Web UI（终端模式）
-python main.py --no-web
+python main.py --ai-fix
 
 # 指定 Web UI 端口（默认 8080，被占用自动顺延）
 python main.py -w 8090
@@ -133,18 +114,29 @@ python main.py -w 8090
 - **AI 修复建议** -- 浏览所有已生成的 AI 修复方案
 - **历史快照** -- 查看历史快照列表和每次快照的 Work Items 详情
 
-Web 看板使用 Flask 后端 + 原生 HTML/CSS/JS 前端，无需任何前端构建工具。
+Web 看板使用 Flask 后端 + 原生 HTML/CSS/JS 前端，UI 基于 Tailwind CSS v4 构建。
 
 ```bash
 # 默认自动启动 Web UI（端口 8080，被占用自动顺延）
 python main.py
 
-# 禁用 Web UI
-python main.py --no-web
-
 # 指定端口
 python main.py -w 3000
 ```
+
+### 前端开发
+
+修改 `styles/app.css` 后重新构建 Tailwind CSS：
+
+```bash
+# 一次性构建
+npm run build:css
+
+# 监听模式（开发时自动编译）
+npm run watch:css
+```
+
+构建产物 `static/tailwind.css` 已提交到仓库，无需 Node.js 即可运行。仅在修改 UI 样式时才需要 npm。
 
 ## 增量差异说明
 
@@ -189,7 +181,7 @@ NOTIFY_WEBHOOK_URL=https://hooks.slack.com/services/xxx
 当 Azure DevOps API 不可用时（网络中断、Token 过期等），程序自动回退到离线模式：
 
 1. 从本地 SQLite 加载最近一次快照数据
-2. 终端和 Web UI 清晰标注"离线模式"
+2. Web UI 清晰标注"离线模式"
 3. AI 修复和通知功能自动跳过
 
 无需任何额外配置，自动切换。

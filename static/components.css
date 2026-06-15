@@ -263,16 +263,57 @@ body {
   letter-spacing: 0.2px;
   background: var(--primary);
   color: var(--on-primary);
-  transition: background var(--transition-fast), transform var(--transition-fast);
+  transition: background var(--transition-fast);
   white-space: nowrap;
+  user-select: none;
 }
 
 .btn-refresh:hover {
   background: var(--primary-pressed);
 }
 
-.btn-refresh:active {
-  transform: scale(0.97);
+/* ══════════════════════════════════════════════════════════
+   Export 按钮 — button-secondary
+   ══════════════════════════════════════════════════════════ */
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: var(--sp-sm) var(--sp-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.2px;
+  background: transparent;
+  color: var(--on-dark);
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-export:hover {
+  background: var(--surface-elevated);
+}
+
+/* ══════════════════════════════════════════════════════════
+   View Toggle Bar — 全量/个人视图切换
+   ══════════════════════════════════════════════════════════ */
+.view-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  margin-bottom: var(--sp-xl);
+}
+
+.view-label {
+  font-size: 14px;
+  color: var(--mute);
+  margin-right: var(--sp-xs);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -392,6 +433,110 @@ body {
   letter-spacing: 0.1px;
   color: var(--ash);
   white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Snapshot Back Bar — 查看历史快照详情时的返回导航
+   ══════════════════════════════════════════════════════════ */
+.snapshot-back-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) 0;
+  margin-bottom: var(--sp-sm);
+}
+
+.snapshot-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-xs) var(--sp-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.2px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.snapshot-back-btn:hover {
+  background: var(--surface-elevated);
+  border-color: var(--hairline-strong);
+}
+
+.snapshot-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  transition: all var(--transition-fast);
+}
+
+.snapshot-nav-btn:hover:not(:disabled) {
+  background: var(--surface-elevated);
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+}
+
+.snapshot-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.snapshot-back-info {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0.1px;
+  color: var(--ash);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Error Banner — 数据获取失败时显示
+   ══════════════════════════════════════════════════════════ */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-md) var(--sp-lg);
+  margin-bottom: var(--sp-xl);
+  background: var(--accent-red-soft);
+  border: 1px solid rgba(255, 97, 97, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--accent-red);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.error-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--accent-red);
+  color: var(--canvas);
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -593,6 +738,22 @@ tbody tr:last-child td {
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: 0.4px;
+  transition: all var(--transition-fast);
+}
+
+.diff-tag.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.diff-tag.clickable:hover {
+  filter: brightness(1.25);
+  transform: scale(1.05);
+}
+
+.diff-tag.active {
+  outline: 2px solid var(--on-dark);
+  outline-offset: 1px;
 }
 
 .diff-tag.new {
@@ -764,6 +925,22 @@ tbody tr:last-child td {
 }
 
 /* ══════════════════════════════════════════════════════════
+   Fixes Toolbar -- AI 修复建议搜索栏
+   ══════════════════════════════════════════════════════════ */
+.fixes-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-lg) var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fixes-toolbar .search-wrap {
+  flex: 1;
+  max-width: 360px;
+}
+
+/* ══════════════════════════════════════════════════════════
    History Snapshots — command-palette-row 风格
    ══════════════════════════════════════════════════════════ */
 .snapshot-item {
@@ -796,6 +973,18 @@ tbody tr:last-child td {
   font-size: 14px;
 }
 
+.snapshot-item .snapshot-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.snapshot-item .snap-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  flex-shrink: 0;
+}
+
 .snapshot-item .snap-count {
   color: var(--ash);
   font-size: 13px;
@@ -805,6 +994,90 @@ tbody tr:last-child td {
   color: var(--accent-blue);
   font-weight: 500;
   margin-right: var(--sp-sm);
+}
+
+/* Compare with previous shortcut button */
+.snapshot-compare-prev {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-xxs) var(--sp-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ash);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.2px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.snapshot-compare-prev:hover {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  background: var(--accent-green-soft);
+}
+
+/* Snapshot selected state (compare mode) */
+.snapshot-item.snapshot-selected {
+  border-color: var(--accent-green);
+  background: var(--accent-green-soft);
+}
+
+/* Checkbox for compare mode */
+.snapshot-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--sp-md);
+  border: 2px solid var(--hairline-strong);
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--canvas);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.snapshot-checkbox.checkbox-checked {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.snapshot-checkbox:hover {
+  border-color: var(--accent-green);
+}
+
+/* Compare mode toolbar */
+.history-compare-bar {
+  display: flex;
+  align-items: center;
+  padding: var(--sp-sm) var(--sp-lg) var(--sp-md);
+  border-bottom: 1px solid var(--hairline);
+  gap: var(--sp-sm);
+}
+
+/* Diff section header */
+.diff-section-header td {
+  padding: var(--sp-sm) var(--sp-lg);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mute);
+  background: var(--surface-elevated);
+  border-bottom: 2px solid var(--hairline);
+  letter-spacing: 0.3px;
+}
+
+.diff-section-header.unchanged td {
+  color: var(--ash);
+  font-weight: 400;
+  border-bottom: 1px solid var(--hairline);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -924,8 +1197,30 @@ tbody tr:last-child td {
 }
 
 /* ══════════════════════════════════════════════════════════
-   Responsive — 遵循 Raycast 断点策略
+   Responsive — 遵循 Raycast DESIGN.md 断点策略
+
+   断点: 1024px / 768px / 480px / 320px
+   Section padding: 96px -> 64px -> 48px -> 32px
+   Touch targets: >= 36px
    ══════════════════════════════════════════════════════════ */
+
+/* ── desktop-small (<= 1024px) ── */
+@media (max-width: 1024px) {
+  .container {
+    padding: var(--sp-xl) var(--sp-lg) var(--sp-xl);
+  }
+
+  thead th,
+  tbody td {
+    padding: var(--sp-sm) var(--sp-md);
+  }
+
+  .modal {
+    max-width: 560px;
+  }
+}
+
+/* ── tablet (<= 768px) ── */
 @media (max-width: 768px) {
   .container {
     padding: var(--sp-md) var(--sp-md) 64px;
@@ -935,46 +1230,106 @@ tbody tr:last-child td {
     height: 3px;
   }
 
+  /* Header — 垂直堆叠 */
   .header {
     height: auto;
     flex-direction: column;
     align-items: stretch;
     padding-bottom: var(--sp-md);
+    gap: var(--sp-sm);
   }
 
   .header-left {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--sp-sm);
   }
 
   .header-right {
-    align-self: flex-end;
+    align-self: stretch;
+    justify-content: space-between;
   }
 
+  .header-left h1 {
+    font-size: 16px;
+  }
+
+  .meta-info {
+    font-size: 13px;
+  }
+
+  .update-time {
+    font-size: 12px;
+  }
+
+  /* Nav — 水平滚动 */
   .nav-bar {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
+  /* View toggle */
+  .view-toggle-bar {
+    margin-bottom: var(--sp-md);
+  }
+
+  /* Toolbar — 纵向堆叠 */
   .toolbar {
     flex-direction: column;
     align-items: stretch;
     gap: var(--sp-sm);
+    margin-bottom: var(--sp-md);
   }
 
   .search-wrap {
     flex: none;
     width: 100%;
+    max-width: none;
   }
 
   .filter-chips {
     overflow-x: auto;
     flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--sp-xs);
   }
 
+  .toolbar-spacer {
+    display: none;
+  }
+
+  .result-count {
+    align-self: flex-start;
+  }
+
+  /* Stats — 纵向排列 */
   .stats-row {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-sm);
+    margin-bottom: var(--sp-md);
+  }
+
+  .stats {
+    gap: var(--sp-lg);
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .diff-summary {
+    width: 100%;
+  }
+
+  /* Table — 横向滚动 */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 560px;
   }
 
   thead th,
@@ -983,18 +1338,216 @@ tbody tr:last-child td {
     font-size: 14px;
   }
 
-  .stat-value {
-    font-size: 20px;
+  /* Fixes panel */
+  .fixes-toolbar {
+    padding: var(--sp-md);
   }
 
+  .fix-card {
+    padding: var(--sp-lg);
+  }
+
+  .fix-card .fix-content {
+    padding: var(--sp-md);
+    font-size: 13px;
+    max-height: 320px;
+  }
+
+  /* History */
+  .snapshot-item {
+    padding: var(--sp-md);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-sm);
+  }
+
+  .snapshot-item .snap-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .history-compare-bar {
+    padding: var(--sp-sm) var(--sp-md);
+  }
+
+  /* Snapshot back bar */
+  .snapshot-back-bar {
+    flex-wrap: wrap;
+    gap: var(--sp-sm);
+  }
+
+  /* Modal */
   .modal {
     padding: var(--sp-xl);
+    max-width: 92vw;
+  }
+
+  .modal h3 {
+    font-size: 16px;
+  }
+
+  .modal .wi-description {
+    max-height: 240px;
+  }
+
+  /* Error banner */
+  .error-banner {
+    padding: var(--sp-sm) var(--sp-md);
+    font-size: 13px;
   }
 }
 
+/* ── mobile (<= 480px) ── */
 @media (max-width: 480px) {
   .container {
     padding: var(--sp-sm) var(--sp-sm) 48px;
+  }
+
+  /* Header */
+  .header {
+    padding-bottom: var(--sp-sm);
+  }
+
+  .header-left .sprint-name {
+    font-size: 13px;
+    padding: var(--sp-xxs) var(--sp-sm);
+  }
+
+  .offline-badge {
+    font-size: 11px;
+    padding: var(--sp-xxs) var(--sp-xs);
+  }
+
+  /* Buttons — 全宽 */
+  .btn-refresh,
+  .btn-export {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-right {
+    gap: var(--sp-xs);
+  }
+
+  /* Stats — 紧凑 */
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
+
+  .stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Table — 最小宽度缩小 */
+  table {
+    min-width: 460px;
+  }
+
+  thead th,
+  tbody td {
+    padding: var(--sp-xs) var(--sp-sm);
+    font-size: 13px;
+  }
+
+  /* Filter chips */
+  .chip {
+    padding: var(--sp-xs) var(--sp-sm);
+    font-size: 13px;
+  }
+
+  /* Nav tabs */
+  .btn-tab {
+    padding: var(--sp-xs) var(--sp-sm);
+    font-size: 13px;
+  }
+
+  /* Fixes */
+  .fix-card {
+    padding: var(--sp-md);
+  }
+
+  .fix-card .bug-id {
+    font-size: 16px;
+  }
+
+  .fix-card .fix-content {
+    font-size: 12px;
+    max-height: 240px;
+  }
+
+  /* History */
+  .snapshot-item .snap-sprint,
+  .snapshot-item .snap-time {
+    font-size: 13px;
+  }
+
+  /* Modal */
+  .modal {
+    padding: var(--sp-lg);
+    border-radius: var(--radius-md);
+  }
+
+  .modal .wi-meta {
+    gap: var(--sp-sm);
+    font-size: 13px;
+  }
+
+  .modal .wi-description {
+    padding: var(--sp-md);
+    font-size: 13px;
+    max-height: 200px;
+  }
+
+  /* Keycap */
+  .keycap {
+    font-size: 12px;
+    padding: 1px var(--sp-xs);
+  }
+}
+
+/* ── mobile-narrow (<= 320px) ── */
+@media (max-width: 320px) {
+  .container {
+    padding: var(--sp-xs) var(--sp-xs) 32px;
+  }
+
+  .header-left h1 {
+    font-size: 14px;
+  }
+
+  .stats {
+    gap: var(--sp-sm);
+  }
+
+  .stat-value {
+    font-size: 16px;
+  }
+
+  table {
+    min-width: 400px;
+  }
+
+  thead th,
+  tbody td {
+    padding: var(--sp-xxs) var(--sp-xs);
+    font-size: 12px;
+  }
+
+  .btn-refresh,
+  .btn-export {
+    height: 32px;
+    padding: var(--sp-xs) var(--sp-sm);
+    font-size: 13px;
+  }
+
+  .modal {
+    padding: var(--sp-md);
+    border-radius: var(--radius-sm);
   }
 }
 

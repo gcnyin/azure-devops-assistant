@@ -2,8 +2,11 @@
 Azure DevOps REST API 客户端
 """
 import base64
+from html import unescape
 import re
 import time
+from urllib.parse import quote
+
 import requests
 from typing import Any
 
@@ -13,17 +16,21 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 
+def _default_config() -> Config:
+    """返回默认的 Config 实例（从环境变量读取），作为延迟创建的兜底"""
+    return Config()
+
+
 def _strip_html(html: str) -> str:
     """去掉 HTML 标签，保留纯文本"""
     text = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
     text = re.sub(r"</?p[^>]*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</?div[^>]*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
-    text = text.replace("&nbsp;", " ")
-    text = text.replace("&amp;", "&")
-    text = text.replace("&lt;", "<")
-    text = text.replace("&gt;", ">")
-    text = text.replace("&quot;", '"')
+    # 使用标准库 html.unescape 解码所有 HTML 实体（&apos; &#39; &#x27; 等）
+    text = unescape(text)
+    # 将不间断空格（\xa0）统一转为普通空格
+    text = text.replace('\xa0', ' ')
     # 合并连续空行
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
@@ -36,8 +43,10 @@ class AzureDevOpsClient:
 
     _TIMEOUT = 30  # 秒
 
-    def __init__(self, config: type[Config] = Config):
-        self.config = config
+    def __init__(self, config: Config | None = None):
+        if config is None:
+            config = _default_config()
+        self.config: Config = config
         self._session = requests.Session()
         # Basic Auth: 用户名留空，PAT 作为密码
         auth = base64.b64encode(f":{config.PAT}".encode()).decode()
@@ -63,9 +72,12 @@ class AzureDevOpsClient:
         kwargs.setdefault("timeout", self._TIMEOUT)
         last_status = None
         last_exception: Exception | None = None
+        logger.debug("HTTP %s %s", method, url)
         for attempt in range(self._RETRIES):
             try:
                 resp = self._session.request(method, url, **kwargs)
+                # 成功获得 HTTP 响应后，清除之前可能遗留的网络异常
+                last_exception = None
                 # 4xx（除 429）不重试
                 if resp.status_code < 500 and resp.status_code != 429:
                     return resp
@@ -86,6 +98,7 @@ class AzureDevOpsClient:
                 if attempt < self._RETRIES - 1:
                     time.sleep(2 ** attempt)
 
+        # 所有重试耗尽：若最后一次是网络异常则抛出，否则返回最后一次 HTTP 响应
         if last_exception is not None:
             raise last_exception
         # 所有重试耗尽，返回最后一次 HTTP 响应（可能是 429 或 5xx）
@@ -109,7 +122,7 @@ class AzureDevOpsClient:
             return self.config.TEAM
 
         # 获取项目下所有 Team
-        url = f"{self.config.base_url()}/_apis/projects/{self.config.PROJECT}/teams"
+        url = f"{self.config.base_url()}/_apis/projects/{quote(self.config.PROJECT, safe='')}/teams"
         try:
             resp = self._request("GET", url, params={"api-version": "7.1"})
             if resp.status_code != 200:
@@ -123,12 +136,14 @@ class AzureDevOpsClient:
         # 对每个 Team 查当前 Sprint，找第一个覆盖今天的
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
+        logger.debug("自动发现 Team: 项目下有 %d 个团队", len(teams))
 
         for team in teams:
             team_name = team["name"]
             try:
                 iter_url = (
-                    f"{self.config.base_url()}/{self.config.PROJECT}/{team_name}"
+                    f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}"
+                    f"/{quote(team_name, safe='')}"
                     f"/_apis/work/teamsettings/iterations"
                 )
                 r = self._request(
@@ -153,7 +168,7 @@ class AzureDevOpsClient:
         raise RuntimeError(
             f"项目 [{self.config.PROJECT}] 下所有团队均没有 Sprint 覆盖今天 "
             f"({now.strftime('%Y-%m-%d')})。"
-            f"请在 Azure DevOps → Boards → Sprints 中设置当前 Iteration 的日期，"
+            f"请在 Azure DevOps -> Boards -> Sprints 中设置当前 Iteration 的日期，"
             f"或在 .env 中指定 AZURE_DEVOPS_TEAM。"
         )
 
@@ -163,7 +178,7 @@ class AzureDevOpsClient:
 
     def team_api_url(self) -> str:
         """返回团队级别 API 基础 URL"""
-        return f"{self.config.base_url()}/{self.config.PROJECT}/{self._team}"
+        return f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/{quote(self._team, safe='')}"
 
     # ------------------------------------------------------------------
     # 身份识别
@@ -239,7 +254,7 @@ class AzureDevOpsClient:
             team_label = self._team
             raise RuntimeError(
                 f"团队 [{team_label}] 没有 Sprint 覆盖今天 ({now.strftime('%Y-%m-%d')})。"
-                f"请在 Azure DevOps → Boards → Sprints 为 [{team_label}] 设置当前 Iteration 的日期。"
+                f"请在 Azure DevOps -> Boards -> Sprints 为 [{team_label}] 设置当前 Iteration 的日期。"
             )
 
         # 如果有多个（理论上不会），取第一个
@@ -267,9 +282,12 @@ class AzureDevOpsClient:
         iteration_path: Iteration 路径，如 "MyProject\\Sprint 1"
         states: 状态列表，如 ["To Do", "In Progress"]；传 None 表示不过滤，拉全部
         """
-        where_clauses = [f"[System.IterationPath] = '{iteration_path}'"]
+        # 转义单引号：WIQL 中用两个单引号表示一个字面单引号
+        safe_path = iteration_path.replace("'", "''")
+        where_clauses = [f"[System.IterationPath] = '{safe_path}'"]
         if states:
-            state_filter = ", ".join(f"'{s}'" for s in states)
+            safe_states = [s.replace("'", "''") for s in states]
+            state_filter = ", ".join(f"'{s}'" for s in safe_states)
             where_clauses.append(f"[System.State] IN ({state_filter})")
 
         wiql = (
@@ -281,7 +299,7 @@ class AzureDevOpsClient:
             f"ORDER BY [System.State], [System.WorkItemType]"
         )
 
-        url = f"{self.config.base_url()}/{self.config.PROJECT}/_apis/wit/wiql"
+        url = f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/_apis/wit/wiql"
         resp = self._request(
             "POST", url,
             json={"query": wiql},
@@ -321,7 +339,7 @@ class AzureDevOpsClient:
                 "assignedTo": assigned_to.get("displayName", "Unassigned") if assigned_to else "Unassigned",
                 "createdDate": fields.get("System.CreatedDate", "N/A"),
                 "description": description,
-                "htmlUrl": f"{self.config.base_url()}/{self.config.PROJECT}/_workitems/edit/{item_id}",
+                "htmlUrl": f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/_workitems/edit/{item_id}",
             })
 
         return result
@@ -333,10 +351,12 @@ class AzureDevOpsClient:
 
         # 分批处理（API 限制一次最多 200 个 ID）
         all_details = {}
+        total_batches = (len(ids) + 199) // 200
+        logger.debug("批量获取 Work Items: %d 个, 分 %d 批", len(ids), total_batches)
         for i in range(0, len(ids), 200):
             batch = ids[i:i + 200]
             ids_str = ",".join(str(x) for x in batch)
-            url = f"{self.config.base_url()}/{self.config.PROJECT}/_apis/wit/workitems"
+            url = f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/_apis/wit/workitems"
             resp = self._request(
                 "GET", url,
                 params={
@@ -350,4 +370,5 @@ class AzureDevOpsClient:
             for item in data.get("value", []):
                 all_details[item["id"]] = item
 
+        logger.debug("Work Items 详情获取完成: %d 条", len(all_details))
         return all_details

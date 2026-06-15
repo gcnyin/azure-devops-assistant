@@ -1,0 +1,17 @@
+[tool.mypy]
+python_version = "3.10"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+warn_unreachable = true
+check_untyped_defs = false
+
+# 第三方库无类型存根，忽略导入错误
+[[tool.mypy.overrides]]
+module = [
+    "schedule",
+    "requests",
+    "flask",
+    "dotenv",
+]
+ignore_missing_imports = true

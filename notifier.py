@@ -75,6 +75,7 @@ def _send_webhook(webhook_url: str, payload: dict):
 def notify_changes(
     diff_info: dict,
     iteration: dict,
+    config: Config,
     project: str = "",
 ):
     """根据配置检测到变化时发送通知。
@@ -91,7 +92,7 @@ def notify_changes(
     if total_changes == 0:
         return
 
-    project_label = project or Config.PROJECT
+    project_label = project or config.PROJECT
     sprint_label = iteration.get("name", "")
 
     # 构建通知内容
@@ -107,11 +108,11 @@ def notify_changes(
     body = f"{', '.join(parts)}  —  {datetime.now().strftime('%H:%M:%S')}"
 
     # 桌面通知
-    if Config.NOTIFY_DESKTOP:
+    if config.NOTIFY_DESKTOP:
         _send_desktop(title, body)
 
     # Webhook 通知
-    if Config.NOTIFY_WEBHOOK_URL:
+    if config.NOTIFY_WEBHOOK_URL:
         # Slack 兼容格式
         color = "#eab308"  # yellow for general changes
         if new_count > 0:
@@ -127,16 +128,32 @@ def notify_changes(
         if gone_count:
             fields.append({"title": "[消失]", "value": str(gone_count), "short": True})
 
+        # 前 5 个新增 Work Item 详情链接
+        top_new_items = diff_info.get("new_items", [])[:5]
+        item_lines = []
+        for item in top_new_items:
+            wi_title = item.get("title", "N/A")
+            wi_url = item.get("htmlUrl", "")
+            wi_type = item.get("type", "")
+            if wi_url:
+                item_lines.append(f"- <{wi_url}|[{wi_type}] {wi_title}>")
+            else:
+                item_lines.append(f"- [{wi_type}] {wi_title}")
+
+        text = body
+        if item_lines:
+            text += "\n" + "\n".join(item_lines)
+
         payload = {
             "attachments": [
                 {
                     "color": color,
                     "title": title,
-                    "text": body,
+                    "text": text,
                     "fields": fields,
-                    "footer": f"Sprint: {sprint_label} ({iteration.get('startDate', '')[:10]} → {iteration.get('finishDate', '')[:10]})",
+                    "footer": f"Sprint: {sprint_label} ({iteration.get('startDate', '')[:10]} -> {iteration.get('finishDate', '')[:10]})",
                     "ts": int(datetime.now().timestamp()),
                 }
             ]
         }
-        _send_webhook(Config.NOTIFY_WEBHOOK_URL, payload)
+        _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)

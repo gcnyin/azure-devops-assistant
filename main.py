@@ -6,7 +6,10 @@ Azure DevOps Sprint 看板监控 — Web UI 模式
 """
 
 import argparse
+import signal
+import socket
 import sys
+import threading
 import time
 from datetime import datetime
 
@@ -14,14 +17,30 @@ import schedule
 
 from config import Config
 from azure_devops import AzureDevOpsClient
-from db import init_db, load_previous_items, save_snapshot, diff_items, load_snapshot_by_id
+from db import init_db, load_previous_items, save_snapshot, diff_items, load_snapshot_by_id, list_snapshots
 from notifier import notify_changes
 from web import update_cached_data, run_web_server
-from utils import find_available_port, setup_logging, get_logger
+from utils import setup_logging, get_logger
+
+# ── 全局配置实例 ──
+config = Config()
 
 # ── 日志 ──
-setup_logging(log_dir=Config.LOG_DIR or None)
+setup_logging(log_dir=config.LOG_DIR or None)
 logger = get_logger(__name__)
+
+# ── 优雅关闭 ──
+_shutdown_event = threading.Event()
+
+
+def _shutdown_handler(signum, frame):
+    """信号处理器：设置停止标志，让调度循环优雅退出"""
+    sig_name = signal.Signals(signum).name
+    logger.info("收到 %s 信号，正在优雅关闭...", sig_name)
+    _shutdown_event.set()
+    # 退出进程，触发 Python 清理流程（atexit、日志缓冲区刷新等）
+    raise SystemExit(0)
+
 
 
 # ── 数据获取 ──
@@ -30,10 +49,15 @@ def fetch_data(
     client: AzureDevOpsClient,
     assigned_to: str | None = None,
     with_diff: bool = True,
+    filter_by_user: bool = True,
 ) -> tuple[dict, list[dict], dict | None]:
-    """获取 Sprint 数据，个人模式下只保存本人卡片，全量模式下保存全部"""
+    """获取 Sprint 数据，个人模式下只保存本人卡片，全量模式下保存全部
+
+    filter_by_user: 为 True 且 assigned_to 非空时，仅返回当前用户的卡片；
+                    为 False 时返回全部卡片（全量视图）。
+    """
     iteration = client.get_current_iteration()
-    incomplete_set = {s.lower() for s in Config.QUERY_STATES}
+    incomplete_set = {s.lower() for s in config.QUERY_STATES}
 
     # 始终拉取全量 Work Items（不受状态/负责人限制），用于快照
     all_items = client.query_work_items(iteration_path=iteration["path"], states=None)
@@ -41,20 +65,22 @@ def fetch_data(
                 iteration["name"], client.team_name, len(all_items))
 
     # 展示层过滤
-    if assigned_to:
+    # 返回所有 Work Items（含已完成），以便终端/导出/Web 正确统计完成数
+    if assigned_to and filter_by_user:
         user_lower = assigned_to.lower()
         items = [it for it in all_items if it.get("assignedTo", "").lower() == user_lower]
-        items.sort(key=lambda it: (
-            0 if it["state"].lower() in incomplete_set else 1,
-            it["state"], it["type"],
-        ))
     else:
-        items = [it for it in all_items if it["state"].lower() in incomplete_set]
+        items = list(all_items)
+    # 统一排序：未完成的排前面，已完成的排后面
+    items.sort(key=lambda it: (
+        0 if it["state"].lower() in incomplete_set else 1,
+        it["state"], it["type"],
+    ))
 
     # 快照数据：个人模式下只保存本人的卡片；全量模式下保存全部
     snapshot_items = (
         [it for it in all_items if it.get("assignedTo", "").lower() == assigned_to.lower()]
-        if assigned_to else all_items
+        if (assigned_to and filter_by_user) else all_items
     )
 
     # 增量对比：基于快照数据做 diff
@@ -65,7 +91,7 @@ def fetch_data(
             new_items, cont_items, gone_items = diff_items(snapshot_items, prev_items)
             if not assigned_to:
                 new_items = [it for it in new_items if it["state"].lower() in incomplete_set]
-                cont_items = [it for it in cont_items if it["state"].lower() in incomplete_set]
+                cont_items = [it for it in cont_items if it.get("_state_changed") or it["state"].lower() in incomplete_set]
                 gone_items = [it for it in gone_items if it.get("state", "").lower() in incomplete_set]
             diff_info = {
                 "prev_time": prev_time,
@@ -82,12 +108,30 @@ def fetch_data(
 
 
 def load_offline_data(
-    sprint_name: str,
-    team_name: str,
+    sprint_name: str = "",
+    team_name: str = "",
     assigned_to: str | None = None,
+    filter_by_user: bool = True,
 ) -> tuple[dict, list[dict], dict | None] | None:
-    """离线模式：从数据库加载最后一次快照"""
-    prev_items, prev_time = load_previous_items(sprint_name, team_name)
+    """离线模式：从数据库加载最后一次快照
+
+    如果 sprint_name 为空，则自动查找该 team 下最近的一次快照作为降级路径。
+    """
+    if sprint_name:
+        prev_items, prev_time = load_previous_items(sprint_name, team_name)
+    else:
+        # 无 sprint_name 时降级：列出该 team 所有快照，取最新一条
+        snaps = list_snapshots(team_name=team_name)
+        if not snaps:
+            return None
+        snapshot_data = load_snapshot_by_id(snaps[0]["id"])
+        if not snapshot_data:
+            return None
+        items_from_db, meta = snapshot_data
+        sprint_name = meta["sprint_name"]
+        prev_items = {it["id"]: it for it in items_from_db}
+        prev_time = meta["fetched_at"]
+
     if not prev_items:
         return None
 
@@ -100,17 +144,18 @@ def load_offline_data(
     }
 
     snapshot_list = list(prev_items.values())
-    incomplete_set = {s.lower() for s in Config.QUERY_STATES}
+    incomplete_set = {s.lower() for s in config.QUERY_STATES}
 
-    if assigned_to:
+    # 返回所有 Work Items（含已完成），以保持一致统计口径
+    if assigned_to and filter_by_user:
         user_lower = assigned_to.lower()
         items = [it for it in snapshot_list if it.get("assignedTo", "").lower() == user_lower]
-        items.sort(key=lambda it: (
-            0 if it["state"].lower() in incomplete_set else 1,
-            it["state"], it["type"],
-        ))
     else:
-        items = [it for it in snapshot_list if it["state"].lower() in incomplete_set]
+        items = list(snapshot_list)
+    items.sort(key=lambda it: (
+        0 if it["state"].lower() in incomplete_set else 1,
+        it["state"], it["type"],
+    ))
 
     diff_info = {
         "prev_time": prev_time,
@@ -127,13 +172,17 @@ def check_once(
     client: AzureDevOpsClient,
     assigned_to: str | None = None,
     with_diff: bool = True,
+    filter_by_user: bool = True,
 ) -> tuple | None:
     """执行一次检查，返回 (iteration, items, diff_info, offline) 或 None（出错时）"""
     offline = False
     try:
         iteration, items, diff_info = fetch_data(
             client, assigned_to=assigned_to, with_diff=with_diff,
+            filter_by_user=filter_by_user,
         )
+        # 保存当前 Sprint 名称，供下次 API 失败时离线回退使用
+        client._last_sprint_name = iteration["name"]
     except Exception as e:
         logger.error("API 请求失败: %s", e)
 
@@ -141,35 +190,14 @@ def check_once(
         logger.warning("尝试从本地数据库加载上次快照...")
         try:
             sprint_name = getattr(client, '_last_sprint_name', '')
-            team_name = client.team_name
-            if sprint_name:
-                offline_result = load_offline_data(sprint_name, team_name, assigned_to)
-                if offline_result:
-                    iteration, items, diff_info = offline_result
-                    offline = True
-                    logger.info("离线模式 — 显示上次快照数据 (%s)", diff_info["prev_time"])
-                else:
-                    logger.error("本地无可用快照")
-                    return None
+            offline_result = load_offline_data(sprint_name, client.team_name, assigned_to, filter_by_user=filter_by_user)
+            if offline_result:
+                iteration, items, diff_info = offline_result
+                offline = True
+                logger.info("离线模式 — 显示上次快照数据 (%s)", diff_info["prev_time"])
             else:
-                from db import list_snapshots
-                snaps = list_snapshots()
-                if snaps:
-                    snapshot_data = load_snapshot_by_id(snaps[0]["id"])
-                    if snapshot_data:
-                        items_from_db, meta = snapshot_data
-                        iteration = {
-                            "id": "", "name": meta["sprint_name"], "path": "",
-                            "startDate": "", "finishDate": "",
-                        }
-                        items = items_from_db
-                        diff_info = {"prev_time": meta["fetched_at"], "new_items": [], "continuing_items": [], "gone_items": []}
-                        offline = True
-                        logger.info("离线模式 — 显示上次快照数据 (%s)", meta["fetched_at"])
-                    else:
-                        return None
-                else:
-                    return None
+                logger.error("本地无可用快照")
+                return None
         except Exception as e2:
             logger.error("离线模式加载失败: %s", e2)
             return None
@@ -197,16 +225,6 @@ def check_once(
     if offline:
         logger.warning("离线数据 — 非实时")
 
-    # AI 修复建议（后台静默运行）
-    if not offline and diff_info and diff_info["new_items"]:
-        from ai_fix import process_new_bugs
-        new_bugs = [it for it in diff_info["new_items"] if it.get("type") == "Bug"]
-        if new_bugs:
-            work_dir = Config.WORK_DIR or None
-            results = process_new_bugs(new_bugs, work_dir)
-            if results:
-                logger.info("已生成 %d 个 Bug 修复建议", len(results))
-
     # 通知
     if not offline and diff_info:
         nn = len(diff_info["new_items"])
@@ -214,7 +232,7 @@ def check_once(
         ng = len(diff_info["gone_items"])
         if nn or nc or ng:
             try:
-                notify_changes(diff_info, iteration, project=Config.PROJECT)
+                notify_changes(diff_info, iteration, config, project=config.PROJECT)
             except Exception as e:
                 logger.warning("通知发送失败: %s", e)
 
@@ -225,50 +243,58 @@ def check_once(
 
 def main():
     parser = argparse.ArgumentParser(description="Azure DevOps Sprint Board Monitor (Web UI)")
-    parser.add_argument("--once", "-1", action="store_true", help="Run once and exit")
     parser.add_argument("--interval", type=int, default=None, help="Check interval in minutes")
     parser.add_argument(
-        "--me", "-m", type=str, nargs="?", const="__auto__", default="__auto__",
-        help="Show only specified user's cards (default: auto-detect myself)",
+        "--ai-fix", action="store_true",
+        help="Auto-generate AI fix suggestions when new bugs are detected",
     )
-    parser.add_argument(
-        "--all", action="store_true",
-        help="Show all users' cards (override default personal mode)",
-    )
-    parser.add_argument("--no-web", action="store_true",
-                       help="Disable Web UI")
     parser.add_argument("-w", "--web-port", type=int, default=8080,
                        metavar="PORT",
                        help="Web UI start port (default 8080)")
+    parser.add_argument("--public", action="store_true",
+                       help="绑定 0.0.0.0 允许外部访问（默认仅监听 127.0.0.1）")
     args = parser.parse_args()
 
     try:
-        Config.validate()
+        config.validate()
     except ValueError as e:
         logger.error("配置错误: %s", e)
         sys.exit(1)
 
-    logger.info("启动 Sprint Monitor: ORG=%s, PROJECT=%s", Config.ORG, Config.PROJECT)
+    logger.info("启动 Sprint Monitor: ORG=%s, PROJECT=%s", config.ORG, config.PROJECT)
 
     client = AzureDevOpsClient()
-    interval = args.interval or Config.CHECK_INTERVAL_MINUTES
+    interval = args.interval or config.CHECK_INTERVAL_MINUTES
     init_db()
 
-    assigned_to: str | None = None
-    if args.all:
-        assigned_to = None
-    elif args.me is not None:
-        if args.me == "__auto__":
-            assigned_to = client.get_my_display_name()
-            if not assigned_to:
-                logger.error("无法自动识别用户，请手动指定 --me <用户名> 或使用 --all 查看全部")
-                sys.exit(1)
-            logger.info("用户: %s", assigned_to)
-        else:
-            assigned_to = args.me
+    assigned_to = client.get_my_display_name()
+    if not assigned_to:
+        logger.error("无法自动识别当前用户，请检查 PAT 和网络连接")
+        sys.exit(1)
+    logger.info("用户: %s", assigned_to)
 
-    if args.once:
-        result = check_once(client, assigned_to=assigned_to)
+    # ── 启动信息 ──
+    logger.info("Azure DevOps Sprint 监控已启动: ORG=%s, PROJECT=%s, TEAM=%s, 间隔=%d分钟",
+                config.ORG, config.PROJECT, client.team_name, interval)
+    if config.NOTIFY_DESKTOP:
+        logger.info("桌面通知: 已启用")
+    if config.NOTIFY_WEBHOOK_URL:
+        logger.info("Webhook: 已配置")
+
+    def check_and_cache():
+        try:
+            result = check_once(client, assigned_to=assigned_to, filter_by_user=False)
+        except Exception as e:
+            logger.error("check_once 发生未预期异常: %s", e, exc_info=True)
+            try:
+                update_cached_data(
+                    iteration={}, items=[], diff_info=None,
+                    team_name=client.team_name, project=config.PROJECT,
+                    error=f"数据获取失败: {e}",
+                )
+            except Exception:
+                pass
+            return
         if result:
             iteration, items, diff_info, offline = result
             try:
@@ -278,41 +304,18 @@ def main():
                     diff_info=diff_info,
                     assigned_to=assigned_to,
                     team_name=client.team_name,
-                    project=Config.PROJECT,
+                    project=config.PROJECT,
                     offline=offline,
                 )
-            except Exception:
-                pass
-        return
-
-    # ── 启动信息 ──
-    print(f"\nAzure DevOps Sprint 监控已启动")
-    print(f"   组织: {Config.ORG}")
-    print(f"   项目: {Config.PROJECT}")
-    print(f"   团队: {client.team_name}{' (自动发现)' if not Config.TEAM else ''}")
-    print(f"   间隔: {interval} 分钟")
-    print(f"   状态: {', '.join(Config.QUERY_STATES)}")
-    if assigned_to:
-        print(f"   只看: {assigned_to}")
-    if Config.NOTIFY_DESKTOP:
-        print(f"   桌面通知: 已启用")
-    if Config.NOTIFY_WEBHOOK_URL:
-        print(f"   Webhook: 已配置")
-    print()
-
-    def check_and_cache():
-        result = check_once(client, assigned_to=assigned_to)
-        if result:
+            except Exception as e:
+                logger.error("更新 Web 缓存失败（Web UI 将显示过期数据）: %s", e)
+        else:
+            # check_once 返回 None: API 和离线模式均失败
             try:
-                iteration, items, diff_info, offline = result
                 update_cached_data(
-                    iteration=iteration,
-                    items=items,
-                    diff_info=diff_info,
-                    assigned_to=assigned_to,
-                    team_name=client.team_name,
-                    project=Config.PROJECT,
-                    offline=offline,
+                    iteration={}, items=[], diff_info=None,
+                    team_name=client.team_name, project=config.PROJECT,
+                    error="无法连接 Azure DevOps，且本地无可用离线数据",
                 )
             except Exception:
                 pass
@@ -323,31 +326,65 @@ def main():
     # 定时调度
     schedule.every(interval).minutes.do(check_and_cache)
 
-    # ── Web UI（默认启动，除非 --no-web） ──
-    if not args.no_web:
-        import threading
-        web_port = find_available_port(args.web_port)
+    # ── Web UI ──
 
-        print(f"  Web 看板已启动  ->  http://localhost:{web_port}")
-        if web_port != args.web_port:
-            print(f"  （端口 {args.web_port} 已被占用，自动顺延至 {web_port}）")
-        print(f"  按 Ctrl+C 停止\n")
+    # 设置 Web 访问 token（如果配置了）
+    from web import set_web_token, set_web_query_states, set_web_work_dir
+    set_web_token(config.WEB_ACCESS_TOKEN)
+    set_web_query_states(config.QUERY_STATES)
+    set_web_work_dir(config.WORK_DIR)
 
-        def schedule_loop():
-            while True:
-                schedule.run_pending()
-                time.sleep(10)
-        threading.Thread(target=schedule_loop, daemon=True).start()
-        run_web_server(start_port=web_port, debug=False)
-        return
+    # 确定监听地址
+    host = "0.0.0.0" if args.public else "127.0.0.1"
+
+    # 获取本机局域网 IP（仅在 --public 模式下有意义）
+    local_ip = "127.0.0.1"
+    if args.public:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            pass
+
+    print(f"\n  Azure DevOps Sprint Monitor 已启动")
+    print(f"  本地地址:   http://localhost:{args.web_port}")
+    if args.public:
+        if local_ip != "127.0.0.1":
+            print(f"  网络地址:   http://{local_ip}:{args.web_port}")
+        if not config.WEB_ACCESS_TOKEN:
+            print(f"  警告: 未设置 WEB_ACCESS_TOKEN，任何能访问此地址的人均可查看 Sprint 数据")
+    if config.WEB_ACCESS_TOKEN:
+        print(f"  Web 访问 token 已启用")
+    print()
+
+    logger.info("Web 看板启动中，起始端口=%d，绑定地址=%s（端口占用时自动顺延）", args.web_port, host)
+
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, _shutdown_handler)
+    signal.signal(signal.SIGTERM, _shutdown_handler)
+
+    def schedule_loop():
+        while not _shutdown_event.is_set():
+            schedule.run_pending()
+            # 使用短 sleep 分段检查，以便更快响应停止信号
+            for _ in range(10):
+                if _shutdown_event.is_set():
+                    break
+                time.sleep(1)
+        logger.info("调度循环已优雅退出")
+
+    schedule_thread = threading.Thread(target=schedule_loop, daemon=True, name="schedule-loop")
+    schedule_thread.start()
 
     try:
-        while True:
-            schedule.run_pending()
-            time.sleep(10)
-    except KeyboardInterrupt:
-        logger.info("用户中止")
-        print("\nStopped.")
+        run_web_server(start_port=args.web_port, debug=False, host=host)
+    except SystemExit:
+        # 由信号处理器触发的 SystemExit，正常退出
+        pass
+    finally:
+        logger.info("Sprint Monitor 已停止")
 
 
 if __name__ == "__main__":

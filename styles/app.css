@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   Raycast Design Tokens → Tailwind v4 Theme
+   ═══════════════════════════════════════════════════════════════ */
+
+@theme inline {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+
+  /* Surface ladder */
+  --color-canvas: #07080a;
+  --color-surface: #0d0d0d;
+  --color-surface-elevated: #101111;
+  --color-surface-card: #121212;
+  --color-button-fg: #18191a;
+
+  /* Hairline borders */
+  --color-hairline: #242728;
+  --color-hairline-soft: rgb(255 255 255 / 0.08);
+  --color-hairline-strong: rgb(255 255 255 / 0.16);
+
+  /* Text */
+  --color-ink: #f4f4f6;
+  --color-body: #cdcdcd;
+  --color-charcoal: #d3d3d4;
+  --color-mute: #9c9c9d;
+  --color-ash: #6a6b6c;
+  --color-stone: #434345;
+
+  /* Accent */
+  --color-accent-blue: #57c1ff;
+  --color-accent-blue-soft: rgb(87 193 255 / 0.15);
+  --color-accent-red: #ff6161;
+  --color-accent-red-soft: rgb(255 97 97 / 0.15);
+  --color-accent-green: #59d499;
+  --color-accent-green-soft: rgb(89 212 153 / 0.15);
+  --color-accent-yellow: #ffc533;
+  --color-accent-yellow-soft: rgb(255 197 51 / 0.15);
+}
+
+@theme {
+  --animate-overlay-in: overlay-in 150ms ease;
+  --animate-modal-in: modal-in 180ms ease;
+  --animate-shimmer: shimmer 1.4s ease infinite;
+
+  @keyframes overlay-in {
+    from { opacity: 0; }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(8px);
+    }
+  }
+
+  @keyframes shimmer {
+    to { background-position: -200% center; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base layer
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer base {
+  /* Bridge legacy CSS variable names to Tailwind v4 theme */
+  :root {
+    --canvas: var(--color-canvas);
+    --surface: var(--color-surface);
+    --surface-elevated: var(--color-surface-elevated);
+    --surface-card: var(--color-surface-card);
+    --button-fg: var(--color-button-fg);
+    --hairline: var(--color-hairline);
+    --hairline-soft: var(--color-hairline-soft);
+    --hairline-strong: var(--color-hairline-strong);
+    --ink: var(--color-ink);
+    --body: var(--color-body);
+    --charcoal: var(--color-charcoal);
+    --mute: var(--color-mute);
+    --ash: var(--color-ash);
+    --stone: var(--color-stone);
+    --on-dark: var(--color-ink);
+    --on-dark-mute: rgb(255 255 255 / 0.72);
+    --primary: var(--color-ink);
+    --primary-pressed: #e8e8e8;
+    --on-primary: #000000;
+    --accent-blue: var(--color-accent-blue);
+    --accent-blue-soft: var(--color-accent-blue-soft);
+    --accent-red: var(--color-accent-red);
+    --accent-red-soft: var(--color-accent-red-soft);
+    --accent-green: var(--color-accent-green);
+    --accent-green-soft: var(--color-accent-green-soft);
+    --accent-yellow: var(--color-accent-yellow);
+    --accent-yellow-soft: var(--color-accent-yellow-soft);
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+    --sp-xxs: 2px;
+    --sp-xs: 4px;
+    --sp-sm: 8px;
+    --sp-md: 12px;
+    --sp-lg: 16px;
+    --sp-xl: 24px;
+    --sp-xxl: 32px;
+    --sp-section: 96px;
+    --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+    --transition-fast: 120ms ease;
+    --transition-normal: 200ms ease;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: "calt", "kern", "liga", "ss03";
+  }
+
+  body {
+    @apply bg-canvas text-body antialiased min-h-screen leading-relaxed;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Component layer — reused patterns
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Hero stripe */
+  .hero-stripe {
+    @apply w-full h-1;
+    background: linear-gradient(
+      135deg,
+      #ff5757 0%,
+      #ff5757 20%,
+      #a1131a 40%,
+      transparent 40.5%,
+      transparent 55%,
+      #ff5757 55.5%,
+      #a1131a 70%,
+      transparent 70.5%,
+      transparent 82%,
+      #a1131a 82.5%
+    );
+  }
+
+  /* Pill tabs — default */
+  .btn-tab {
+    @apply px-3 py-1 border-none cursor-pointer text-sm font-normal text-body
+           bg-transparent rounded-full transition-all duration-120 whitespace-nowrap
+           hover:text-charcoal;
+  }
+
+  .btn-tab.active {
+    @apply bg-surface-elevated text-ink font-medium;
+  }
+
+  /* Primary button (Refresh) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center h-9 px-4 border-none rounded-lg
+           cursor-pointer text-sm font-medium tracking-wide
+           bg-white text-black transition-colors duration-120
+           hover:bg-gray-200 select-none whitespace-nowrap;
+  }
+
+  /* Secondary button (Export) */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center h-9 px-4 border-none rounded-lg
+           cursor-pointer text-sm font-medium tracking-wide
+           bg-transparent text-ink transition-colors duration-120
+           hover:bg-surface-elevated select-none whitespace-nowrap;
+  }
+
+  /* State badge */
+  .state-badge {
+    @apply inline-block px-1 py-0.5 rounded text-xs font-medium tracking-wider;
+  }
+
+  /* Keycap */
+  .keycap {
+    @apply inline-flex items-center justify-center h-5 px-2
+           text-[13px] text-body rounded;
+    background: linear-gradient(180deg, var(--color-surface-card) 0%, var(--color-surface) 100%);
+  }
+
+  .keycap-sm {
+    @apply h-[18px] px-1 text-[11px];
+  }
+
+  /* Diff tags */
+  .diff-tag {
+    @apply inline-flex items-center gap-1 px-1 py-0.5 rounded text-xs font-medium tracking-wider
+           transition-all duration-120;
+  }
+
+  .diff-tag.clickable {
+    @apply cursor-pointer select-none hover:brightness-125 hover:scale-105;
+  }
+
+  .diff-tag.active {
+    @apply outline-2 outline-offset-1 outline-ink;
+  }
+
+  .diff-tag.new {
+    @apply bg-accent-green-soft text-accent-green;
+  }
+
+  .diff-tag.changed {
+    @apply bg-accent-yellow-soft text-accent-yellow;
+  }
+
+  .diff-tag.gone {
+    @apply bg-accent-red-soft text-accent-red;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply rounded-sm;
+    background: linear-gradient(90deg,
+      var(--color-surface-elevated) 25%,
+      var(--color-surface-card) 37%,
+      var(--color-surface-elevated) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+
+  /* Table wrap */
+  .table-wrap {
+    @apply bg-surface border border-hairline rounded-[10px] overflow-hidden;
+  }
+
+  /* Fix card */
+  .fix-card {
+    @apply bg-surface border border-hairline rounded-[10px] p-6 mb-3;
+    box-shadow: inset 3px 0 0 0 var(--color-accent-blue);
+  }
+
+  /* Snapshot item */
+  .snapshot-item {
+    @apply bg-surface border border-hairline rounded-lg p-3 mb-2 cursor-pointer
+           transition-all duration-120 flex justify-between items-center
+           hover:bg-surface-card hover:border-hairline-strong;
+  }
+
+  .snapshot-item.snapshot-selected {
+    @apply border-accent-green bg-accent-green-soft;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/65 backdrop-blur-sm flex items-center justify-center z-[1000];
+    animation: overlay-in 150ms ease;
+  }
+
+  /* Error banner */
+  .error-banner {
+    @apply flex items-center gap-3 p-3 mb-6 rounded-lg text-sm
+           bg-accent-red-soft border border-red-400/30 text-accent-red;
+  }
+
+  /* Row diff markers */
+  .row-new {
+    box-shadow: inset 3px 0 0 0 var(--color-accent-green);
+  }
+
+  .row-changed {
+    box-shadow: inset 3px 0 0 0 var(--color-accent-yellow);
+  }
+
+  .row-gone {
+    @apply opacity-55;
+  }
+}

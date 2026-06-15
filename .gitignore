@@ -1,40 +1,52 @@
-# Python
+# ── Python ──
 __pycache__/
 *.py[cod]
 *.pyo
 
-# Virtual environment
+# ── Virtual environment ──
 .venv/
 venv/
 env/
 
-# Environment / secrets
+# ── Environment / secrets ──
 .env
 .env.local
 .env.*.local
 
-# IDE
+# ── IDE ──
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# ── Node / Tailwind CSS ──
+node_modules/
+
+# ── OS ──
 .DS_Store
 Thumbs.db
 
-# Distribution
+# ── Distribution ──
 dist/
 *.egg-info/
 build/
 
-# Generated reports & local DB
-sprint_report.*
-my_sprint.*
+# ── 日志文件（终端 + 文件双通道，含轮转备份） ──
+logs/
+*.log
+
+# ── 本地数据库 ──
 sprint_history.db
 *.db
+data/
 
-# Logs
-logs/
+# ── 生成的报告 ──
+sprint_report.*
+my_sprint.*
+
+# ── 工具残留 ──
 .playwright-cli
+.ai-controller-backups
+AI-CHANGELOG.md
+*.bak

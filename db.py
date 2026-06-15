@@ -6,6 +6,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from utils import get_logger
+
+logger = get_logger(__name__)
+
 DB_PATH = Path(__file__).parent / "sprint_history.db"
 
 
@@ -17,6 +21,7 @@ def _connect() -> sqlite3.Connection:
 
 def init_db():
     """初始化表结构"""
+    logger.info("初始化数据库: %s", DB_PATH)
     with _connect() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sprint_snapshot (
@@ -27,7 +32,20 @@ def init_db():
                 work_items_json TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ai_fixes (
+                bug_id INTEGER PRIMARY KEY,
+                bug_title TEXT,
+                response TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        # 启用 WAL 模式：允许并发读取不阻塞写入，避免 Web 线程与后台采集线程之间的锁冲突
+        # WAL 是持久化设置，只需在初始化时执行一次
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.commit()
+    logger.debug("数据库表结构检查完成")
 
 
 def load_previous_items(sprint_name: str, team_name: str) -> dict[int, dict]:
@@ -40,8 +58,14 @@ def load_previous_items(sprint_name: str, team_name: str) -> dict[int, dict]:
             (sprint_name, team_name),
         ).fetchone()
         if row:
-            items = json.loads(row["work_items_json"])
+            try:
+                items = json.loads(row["work_items_json"])
+            except json.JSONDecodeError:
+                logger.warning("上次快照数据损坏，将重新开始对比")
+                return {}, None
+            logger.debug("加载上次快照: %d 项, 时间=%s", len(items), row["fetched_at"])
             return {it["id"]: it for it in items}, row["fetched_at"]
+    logger.debug("未找到历史快照: sprint=%s, team=%s", sprint_name, team_name)
     return {}, None
 
 
@@ -53,16 +77,20 @@ def save_snapshot(sprint_name: str, team_name: str, items: list[dict]):
             "VALUES (?, ?, ?)",
             (sprint_name, team_name, json.dumps(items, ensure_ascii=False)),
         )
-        # 只保留最近 10 条
-        conn.execute(
-            "DELETE FROM sprint_snapshot WHERE id NOT IN ("
-            "SELECT id FROM sprint_snapshot "
+        # 只保留当前 Sprint/Team 最近 10 条
+        cursor = conn.execute(
+            "DELETE FROM sprint_snapshot "
             "WHERE sprint_name = ? AND team_name = ? "
-            "ORDER BY id DESC LIMIT 10"
+            "AND id NOT IN ("
+            "  SELECT id FROM sprint_snapshot "
+            "  WHERE sprint_name = ? AND team_name = ? "
+            "  ORDER BY id DESC LIMIT 10"
             ")",
-            (sprint_name, team_name),
+            (sprint_name, team_name, sprint_name, team_name),
         )
         conn.commit()
+        if cursor.rowcount:
+            logger.debug("清理旧快照: 删除 %d 条", cursor.rowcount)
 
 
 def diff_items(
@@ -109,6 +137,27 @@ def diff_items(
     return new_items, continuing_items, disappeared_items
 
 
+# ── AI 修复建议存取 ──
+
+def save_ai_fix(bug_id: int, bug_title: str, response: str):
+    """保存 AI 修复建议"""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO ai_fixes (bug_id, bug_title, response, updated_at) "
+            "VALUES (?, ?, ?, datetime('now'))",
+            (bug_id, bug_title, response),
+        )
+        conn.commit()
+    logger.debug("保存 AI 修复建议: Bug #%d - %s", bug_id, bug_title)
+
+
+def get_ai_fixes() -> list[dict]:
+    """获取所有已保存的 AI 修复建议"""
+    with _connect() as conn:
+        rows = conn.execute("SELECT * FROM ai_fixes ORDER BY updated_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
 # ── 历史快照浏览 ──
 
 def list_snapshots(sprint_name: str | None = None, team_name: str | None = None) -> list[dict]:
@@ -133,6 +182,7 @@ def list_snapshots(sprint_name: str | None = None, team_name: str | None = None)
                 items = json.loads(r["work_items_json"])
                 count = len(items) if isinstance(items, list) else 0
             except (json.JSONDecodeError, TypeError):
+                logger.warning("快照 #%d 数据损坏，跳过", r["id"])
                 count = 0
             result.append({
                 "id": r["id"],
@@ -141,6 +191,7 @@ def list_snapshots(sprint_name: str | None = None, team_name: str | None = None)
                 "fetched_at": r["fetched_at"],
                 "item_count": count,
             })
+        logger.debug("查询历史快照: 返回 %d 条", len(result))
         return result
 
 

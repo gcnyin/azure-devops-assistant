@@ -8,108 +8,182 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='components.css') }}">
     <script>
         window.INCOMPLETE_STATES_RAW = {{ incomplete_states|safe }};
         window.STATE_COLORS = {{ state_colors|safe }};
+        window.WEB_ACCESS_TOKEN = {{ web_token|safe }};
     </script>
 </head>
 <body>
-    <!-- Hero Stripe — Raycast 的标志性红色对角条纹，每页仅一次 -->
+    <!-- Hero Stripe -->
     <div class="hero-stripe"></div>
 
-    <div class="container">
-        <!-- Primary Nav -->
-        <header class="header">
-            <div class="header-left">
-                <h1 id="projectName">Azure DevOps</h1>
-                <span class="sprint-name" id="sprintName">-</span>
-                <span class="meta-info">
+    <div class="max-w-[1240px] mx-auto px-4 sm:px-6 pt-6 pb-24 sm:pt-6 sm:pb-16">
+        <!-- Header -->
+        <header class="flex items-center justify-between pb-4 mb-2 border-b border-hairline flex-wrap gap-3
+                       max-md:flex-col max-md:items-stretch max-md:gap-2">
+            <div class="flex items-center gap-3 flex-wrap max-md:flex-col max-md:items-start max-md:gap-2">
+                <h1 id="projectName" class="text-lg font-medium tracking-wide text-ink whitespace-nowrap">Azure DevOps</h1>
+                <span class="sprint-name text-sm font-medium text-ink bg-surface-elevated px-3 py-1 rounded-full" id="sprintName">-</span>
+                <span class="meta-info flex items-center gap-3 text-sm text-mute flex-wrap">
                     <span id="sprintDates"></span>
-                    <span class="sep">|</span>
+                    <span class="text-hairline select-none">|</span>
                     <span id="assignedTo">-</span>
-                    <span class="sep">|</span>
+                    <span class="text-hairline select-none">|</span>
                     <span id="teamName">-</span>
                 </span>
-                <span class="update-time">Updated <span id="updateTime">-</span></span>
-                <span class="offline-badge" id="offlineBadge" style="display:none;">Offline</span>
+                <span class="text-[13px] text-ash">Updated <span id="updateTime">-</span></span>
+                <span class="offline-badge items-center gap-1 bg-accent-red-soft text-accent-red px-2 py-0.5 rounded text-xs font-semibold"
+                      id="offlineBadge" style="display:none;">Offline</span>
             </div>
-            <div class="header-right">
-                <span class="keycap" title="Refresh">R</span>
-                <button class="btn-refresh" onclick="refresh()">Refresh</button>
+            <div class="flex items-center gap-2 max-sm:*:flex-1">
+                <button class="btn-secondary" onclick="exportCsv()">Export</button>
+                <span class="keycap max-sm:hidden" title="Refresh">R</span>
+                <button class="btn-primary" onclick="refresh()">Refresh</button>
             </div>
         </header>
 
         <!-- Pill Tabs -->
-        <nav class="nav-bar">
+        <nav class="flex items-center gap-1 mb-6 overflow-x-auto">
             <button class="btn-tab active" id="tabBoard" onclick="switchTab('board')">Board</button>
             <button class="btn-tab" id="tabFixes" onclick="switchTab('fixes')">AI Fixes</button>
             <button class="btn-tab" id="tabHistory" onclick="switchTab('history')">History</button>
         </nav>
 
-        <!-- Search + Filter Chips — store-search-bar + pill-tab 过滤器行 -->
-        <div class="toolbar" id="toolbar">
-            <div class="search-wrap">
-                <span class="search-icon">&#x1F50D;</span>
-                <input type="text" class="search-input" id="searchInput"
-                    placeholder="Filter work items..."
-                    oninput="applyFilters()">
-                <button class="search-clear" id="searchClear" style="display:none"
-                    onclick="clearSearch()" aria-label="Clear">&times;</button>
+        <!-- View Mode Toggle -->
+        <div class="flex items-center gap-1 mb-6" id="viewToggleBar" style="display:none;">
+            <span class="text-sm text-mute mr-1">View:</span>
+            <button class="btn-tab view-btn active" id="btnViewAll" onclick="switchView('all')">All</button>
+            <button class="btn-tab view-btn" id="btnViewMe" onclick="switchView('me')">Me</button>
+        </div>
+
+        <!-- Toolbar: Search + Filter Chips -->
+        <div class="flex items-center gap-3 mb-6 flex-wrap max-md:flex-col max-md:items-stretch max-md:gap-2" id="toolbar">
+            <div class="relative flex-[0_1_320px] min-w-[180px] max-md:flex-none max-md:w-full">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ash pointer-events-none">S</span>
+                <input type="text" class="w-full h-9 pl-[38px] pr-3 border border-hairline rounded-lg bg-surface-elevated
+                                      text-sm text-ink outline-none placeholder:text-ash focus:border-hairline-strong
+                                      transition-colors duration-120"
+                       id="searchInput" placeholder="Filter work items..." oninput="applyFilters()">
+                <button class="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none text-lg
+                               text-ash cursor-pointer hover:text-ink transition-colors duration-120"
+                        id="searchClear" style="display:none;"
+                        onclick="clearSearch()" aria-label="Clear">&times;</button>
             </div>
-            <div class="filter-chips" id="filterChips">
-                <button class="chip state-all active" data-filter="all" onclick="setStateFilter('all', this)">All</button>
-                <!-- 动态生成的状态过滤胶囊 -->
+            <div class="filter-chips flex items-center gap-1 flex-wrap max-md:overflow-x-auto max-md:flex-nowrap max-md:pb-1" id="filterChips">
+                <button class="chip active" data-filter="all">All</button>
                 <div id="dynamicChips"></div>
             </div>
-            <div class="toolbar-spacer"></div>
-            <span class="result-count" id="resultCount"></span>
+            <div class="flex-1 max-md:hidden"></div>
+            <span class="text-[13px] text-ash whitespace-nowrap max-md:self-start" id="resultCount"></span>
         </div>
 
-        <!-- Stats + Diff Summary -->
-        <div class="stats-row">
-            <div class="stats" id="statsRow">
-                <div class="stat total"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total</div></div>
-                <div class="stat open"><div class="stat-value" id="statOpen">-</div><div class="stat-label">Open</div></div>
-                <div class="stat done"><div class="stat-value" id="statDone">-</div><div class="stat-label">Done</div></div>
+        <!-- Snapshot Back Bar -->
+        <div class="flex items-center gap-4 py-2 mb-2" id="snapshotBackBar" style="display:none;">
+            <button class="inline-flex items-center gap-1 px-3 py-1 border border-hairline rounded-md
+                           bg-transparent text-accent-blue text-[13px] font-medium cursor-pointer
+                           hover:bg-surface-elevated hover:border-hairline-strong transition-all duration-120"
+                    onclick="goBackToHistory()">&larr; Back to History</button>
+            <button class="inline-flex items-center justify-center w-7 h-7 p-0 border border-hairline rounded-md
+                           bg-transparent text-mute text-base cursor-pointer transition-all duration-120
+                           hover:bg-surface-elevated hover:border-hairline-strong hover:text-ink
+                           disabled:opacity-30 disabled:cursor-not-allowed"
+                    id="snapshotPrevBtn" onclick="navigateSnapshot(-1)" title="Previous snapshot">&lsaquo;</button>
+            <button class="inline-flex items-center justify-center w-7 h-7 p-0 border border-hairline rounded-md
+                           bg-transparent text-mute text-base cursor-pointer transition-all duration-120
+                           hover:bg-surface-elevated hover:border-hairline-strong hover:text-ink
+                           disabled:opacity-30 disabled:cursor-not-allowed"
+                    id="snapshotNextBtn" onclick="navigateSnapshot(1)" title="Next snapshot">&rsaquo;</button>
+            <span class="text-[13px] text-ash" id="snapshotBackInfo"></span>
+        </div>
+
+        <!-- Error Banner -->
+        <div class="error-banner" id="errorBanner" style="display:none;">
+            <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full
+                         bg-accent-red text-canvas font-bold text-[13px] shrink-0">!</span>
+            <span id="errorBannerText"></span>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-3 max-md:flex-col max-md:items-start max-md:gap-2">
+            <div class="flex gap-6 max-sm:w-full max-sm:justify-between" id="statsRow">
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-medium tabular-nums text-ink" id="statTotal">-</span>
+                    <span class="text-[13px] text-mute">Total</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-medium tabular-nums text-accent-yellow" id="statOpen">-</span>
+                    <span class="text-[13px] text-mute">Open</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-medium tabular-nums text-accent-green" id="statDone">-</span>
+                    <span class="text-[13px] text-mute">Done</span>
+                </div>
             </div>
-            <div class="diff-summary" id="diffSummary" style="display:none;"></div>
+            <div class="flex items-center gap-2 flex-wrap" id="diffSummary" style="display:none;"></div>
         </div>
 
-        <!-- Board Table -->
+        <!-- Board Table Panel -->
         <div class="table-wrap" id="boardPanel">
-            <table>
+            <table class="w-full border-collapse">
                 <thead>
                     <tr>
-                        <th style="width:42px">#</th>
-                        <th style="width:56px">ID</th>
-                        <th>Title</th>
-                        <th style="width:72px">Type</th>
-                        <th style="width:110px">State</th>
-                        <th style="width:96px">Owner</th>
+                        <th class="w-[42px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">#</th>
+                        <th class="w-[56px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">ID</th>
+                        <th class="bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">Title</th>
+                        <th class="w-[72px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">Type</th>
+                        <th class="w-[110px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">State</th>
+                        <th class="w-[96px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap">Owner</th>
+                        <th class="w-[76px] bg-surface-elevated text-mute text-sm font-medium tracking-wide
+                                   px-4 py-3 text-left border-b border-hairline whitespace-nowrap hidden diff-col-header">Change</th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody">
-                    <tr><td colspan="6"><div class="loading-state">Loading...</div></td></tr>
+                    <tr><td colspan="6"><div class="text-center py-16 text-ash">Loading...</div></td></tr>
                 </tbody>
             </table>
         </div>
 
         <!-- AI Fixes Panel -->
         <div class="table-wrap" id="fixesPanel" style="display:none;">
-            <div id="fixesContent"><div class="loading-state">Loading...</div></div>
+            <div class="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-hairline">
+                <div class="relative flex-1 max-w-[360px]">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ash pointer-events-none">S</span>
+                    <input type="text" class="w-full h-9 pl-[38px] pr-3 border border-hairline rounded-lg bg-surface-elevated
+                                          text-sm text-ink outline-none placeholder:text-ash focus:border-hairline-strong
+                                          transition-colors duration-120"
+                           id="fixesSearchInput" placeholder="Search fixes by ID, title or content..."
+                           oninput="applyFixesFilter()">
+                    <button class="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none text-lg
+                                   text-ash cursor-pointer hover:text-ink transition-colors duration-120"
+                            id="fixesSearchClear" style="display:none;"
+                            onclick="clearFixesSearch()" aria-label="Clear">&times;</button>
+                </div>
+            </div>
+            <div id="fixesContent"><div class="text-center py-16 text-ash">Loading...</div></div>
         </div>
 
         <!-- History Panel -->
         <div class="table-wrap" id="historyPanel" style="display:none;">
-            <div id="historyContent"><div class="loading-state">Loading...</div></div>
+            <div id="historyContent"><div class="text-center py-16 text-ash">Loading...</div></div>
         </div>
     </div>
 
     <!-- Modal -->
     <div class="modal-overlay" id="modalOverlay" style="display:none;" onclick="closeModal(event)">
         <div class="modal" id="modalBox" onclick="event.stopPropagation()">
-            <button class="modal-close" onclick="closeModal()" aria-label="Close">
+            <button class="absolute top-3 right-4 bg-transparent border-none cursor-pointer p-1 rounded-md
+                           transition-colors duration-120 hover:bg-surface-card flex items-center gap-1
+                           text-ash text-[13px]"
+                    onclick="closeModal()" aria-label="Close">
                 <span class="keycap keycap-sm">Esc</span>
             </button>
             <div id="modalContent"></div>
