@@ -62,8 +62,6 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
       </div>
       <div className="text-ink mt-1 mb-2 text-base">{fix.bug_title || "(untitled)"}</div>
       <div className="text-ink-muted text-[13px] mb-3">
-        {status === "pending" && "Waiting in queue..."}
-        {status === "running" && "Generating fix..."}
         {status === "completed" && (
           <>Started {formatTime(fix.started_at)} · Took {duration}</>
         )}
@@ -72,7 +70,7 @@ function FixCard({ fix, onRetry }: { fix: FixItem; onRetry: (bugId: number) => v
         )}
       </div>
       {(status === "pending" || status === "running") ? (
-        <div className="bg-surface-dark text-on-dark rounded-lg p-4 text-sm text-ink-soft/60 italic">
+        <div className="bg-surface-card rounded-lg p-4 text-sm text-ink-muted italic">
           {status === "pending" ? "Waiting in queue..." : "AI agent is analyzing the bug..."}
         </div>
       ) : status === "failed" ? (
