@@ -356,7 +356,11 @@ class AzureDevOpsClient:
         title: str = "",
         description: str = "",
     ) -> str:
-        """创建 Pull Request，返回 PR 的 HTML URL"""
+        """创建 Pull Request，返回 PR 的 HTML URL
+
+        若 PR 已存在，查找已有 PR 并返回其 URL。
+        若无法确定 URL，抛出 RuntimeError。
+        """
         url = (
             f"{self.config.base_url()}"
             f"/{quote(self.config.PROJECT, safe='')}"
@@ -373,33 +377,68 @@ class AzureDevOpsClient:
         if resp.status_code == 409:
             # PR 已存在，尝试查找已有 PR
             logger.info("PR 已存在 (409)，查找已有 PR: %s -> %s", source_branch, target_branch)
-            search_url = (
-                f"{self.config.base_url()}"
-                f"/{quote(self.config.PROJECT, safe='')}"
-                f"/_apis/git/repositories/{quote(repo_name, safe='')}/pullrequests"
+            existing = self._find_existing_pr(repo_name, source_branch)
+            if existing:
+                logger.info("找到已有 PR: %s", existing)
+                return existing
+            raise RuntimeError(
+                f"PR 已存在 (409) 但未找到匹配的 PR 记录，"
+                f"source={source_branch}, target={target_branch}"
             )
-            search_resp = self._request(
-                "GET", search_url,
-                params={
-                    "searchCriteria.sourceRefName": f"refs/heads/{source_branch}",
-                    "searchCriteria.status": "active",
-                    "api-version": "7.1",
-                },
-            )
-            if search_resp.status_code == 200:
-                values = search_resp.json().get("value", [])
-                if values:
-                    existing = values[0].get("_links", {}).get("html", {}).get("href", "")
-                    logger.info("找到已有 PR: %s", existing)
-                    return existing
-            logger.warning("未找到已有 PR")
-            return ""
 
         resp.raise_for_status()
         pr_data = resp.json()
-        pr_url = pr_data.get("_links", {}).get("html", {}).get("href", "")
-        logger.info("PR 创建成功: %s", pr_url)
+        pr_id = pr_data.get("pullRequestId")
+        pr_url = self._extract_pr_url(pr_data, repo_name, pr_id)
+        if not pr_url:
+            logger.warning("PR 创建成功但无法提取 URL（_links 和 pullRequestId 均缺失），响应: %s", pr_data)
+        else:
+            logger.info("PR 创建成功: %s", pr_url)
         return pr_url
+
+    def _find_existing_pr(self, repo_name: str, source_branch: str) -> str:
+        """查找已有 PR，先搜 active，再搜全部状态，返回 URL 或空字符串"""
+        search_url = (
+            f"{self.config.base_url()}"
+            f"/{quote(self.config.PROJECT, safe='')}"
+            f"/_apis/git/repositories/{quote(repo_name, safe='')}/pullrequests"
+        )
+        source_ref = f"refs/heads/{source_branch}"
+
+        for status_filter in ["active", "all"]:
+            params = {
+                "searchCriteria.sourceRefName": source_ref,
+                "api-version": "7.1",
+            }
+            if status_filter != "all":
+                params["searchCriteria.status"] = status_filter
+            search_resp = self._request("GET", search_url, params=params)
+            if search_resp.status_code == 200:
+                values = search_resp.json().get("value", [])
+                if values:
+                    pr_data = values[0]
+                    pr_id = pr_data.get("pullRequestId")
+                    pr_url = self._extract_pr_url(pr_data, repo_name, pr_id)
+                    if pr_url:
+                        return pr_url
+        return ""
+
+    def _extract_pr_url(self, pr_data: dict, repo_name: str, pr_id: int | None) -> str:
+        """从 PR 数据中提取 HTML URL，带 fallback 构造"""
+        # 优先从 _links 中提取
+        pr_url = pr_data.get("_links", {}).get("html", {}).get("href", "")
+        if pr_url:
+            return pr_url
+        # 回退：用 pullRequestId 自行构造 URL
+        if pr_id:
+            constructed = (
+                f"{self.config.base_url()}"
+                f"/{quote(self.config.PROJECT, safe='')}"
+                f"/_git/{quote(repo_name, safe='')}/pullrequest/{pr_id}"
+            )
+            logger.debug("_links.html.href 为空，使用构造的 PR URL: %s", constructed)
+            return constructed
+        return ""
 
     def _get_work_items_batch(self, ids: list[int]) -> dict[int, dict]:
         """批量获取 Work Item 详情（最多 200 个/次）"""

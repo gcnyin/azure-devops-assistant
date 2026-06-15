@@ -485,7 +485,7 @@ def _push_and_create_pr(
         return
 
     try:
-        pr_title = f"[AI Fix][{repo_name}] {bug['title']}"
+        pr_title = f"[AI Fix][{repo_name}] #{bug_id} {bug['title']}"
         pr_desc = _build_pr_description(bug, agent, fix_result, repo_result, repo_name)
         pr_url = az_client.create_pull_request(
             repo_name=repo_name,
@@ -503,7 +503,7 @@ def _push_and_create_pr(
                 logger.exception("PR 通知发送失败")
         else:
             pr_results.append({**repo_result, "branch": branch_name,
-                               "pr_url": None, "pr_error": "PR 已存在或创建失败"})
+                               "pr_url": None, "pr_error": "PR URL 为空（意外情况）"})
     except Exception as e:
         logger.error("[%s] PR 创建失败: %s", repo_display, e)
         pr_results.append({**repo_result, "branch": branch_name,
@@ -644,7 +644,7 @@ Bug 描述:{desc_block}
 要求：
 1. 在以上仓库中定位与 Bug 相关的代码文件
 2. **直接修改源文件**（不要只给建议或 diff，要用编辑工具实际修改代码）
-3. 对于每个修改过的仓库，执行 `git add -A` 然后 `git commit -m "fix: {bug['title']} (AB#{bug['id']})"`
+3. 对于每个修改过的仓库，执行 `git add -A` 然后 `git commit -m "fix: #{bug['id']} {bug['title']}"`
 4. 在回复的末尾，输出如下格式的 JSON（以 ---FIX_RESULT--- 单独一行开头）:
 
 ---FIX_RESULT---

@@ -160,9 +160,9 @@ def notify_changes(
 
 
 def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int):
-    """PR 创建成功时发送桌面通知"""
+    """PR 创建成功时发送桌面通知（包含 PR 链接）"""
     title = f"[AI Fix] PR Created - AB#{bug_id}"
-    body = f"{repo_name}: {bug.get('title', 'N/A')[:60]}"
+    body = f"{repo_name}: {bug.get('title', 'N/A')[:60]}\n{pr_url}"
     _send_desktop(title, body)
 
 
