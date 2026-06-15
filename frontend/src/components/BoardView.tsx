@@ -13,12 +13,11 @@ import type { BoardData, WorkItem, DiffFilterType } from "@/types/api";
 
 interface BoardViewProps {
   data?: BoardData;
-  isError: boolean;
   incompleteStates: string[];
   stateColors: Record<string, string>;
 }
 
-export function BoardView({ data, isError, incompleteStates, stateColors }: BoardViewProps) {
+export function BoardView({ data, incompleteStates, stateColors }: BoardViewProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const view = searchParams.get("view") || "all";
@@ -81,10 +80,6 @@ export function BoardView({ data, isError, incompleteStates, stateColors }: Boar
   for (const it of allItems) stateMap[it.state] = (stateMap[it.state] || 0) + 1;
   let bugCount = 0;
   for (const it of allItems) { if ((it.type || "").toLowerCase() === "bug") bugCount++; }
-
-  if (isError) {
-    return <div className="text-center py-16 text-error">Failed to load board data. The server may be unavailable.</div>;
-  }
 
   return (
     <div>

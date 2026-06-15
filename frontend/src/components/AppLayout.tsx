@@ -1,5 +1,4 @@
 import { useSearchParams, Outlet, useNavigate } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { useBoardData, useConfig } from "@/hooks/useApi";
@@ -7,10 +6,9 @@ import { useBoardData, useConfig } from "@/hooks/useApi";
 export function AppLayout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const view = searchParams.get("view") || "all";
   const pathname = window.location.pathname;
-  const { data: boardData, isError } = useBoardData(view);
+  const { data: boardData } = useBoardData(view);
   const { data: config } = useConfig();
 
   let activeTab = "board";
@@ -31,12 +29,6 @@ export function AppLayout() {
     <div className="max-w-[1280px] mx-auto px-4 sm:px-6 pt-6 pb-24 sm:pt-6 sm:pb-16">
       <Header
         data={boardData}
-        isError={isError}
-        onRefresh={() => {
-          queryClient.invalidateQueries({ queryKey: ["board"] });
-          queryClient.invalidateQueries({ queryKey: ["fixes"] });
-          queryClient.invalidateQueries({ queryKey: ["history"] });
-        }}
         onExport={handleExport}
       />
 
@@ -60,7 +52,6 @@ export function AppLayout() {
           incompleteStates: config?.incomplete_states || [],
           stateColors: config?.state_colors || {},
           boardData,
-          isBoardError: isError,
         }}
       />
     </div>
