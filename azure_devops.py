@@ -222,25 +222,37 @@ class AzureDevOpsClient:
     # Sprint / Iteration
     # ------------------------------------------------------------------
 
+    def get_all_iterations(self) -> list[dict[str, str]]:
+        """获取该团队下所有 Iteration（Sprint）列表"""
+        url = f"{self.team_api_url()}/_apis/work/teamsettings/iterations"
+        resp = self._request("GET", url, params={"api-version": "7.1"})
+        resp.raise_for_status()
+        data = resp.json()
+        iterations = data.get("value", [])
+        result = []
+        for it in iterations:
+            attrs = it.get("attributes", {})
+            result.append({
+                "id": it["id"],
+                "name": it["name"],
+                "path": it["path"],
+                "startDate": attrs.get("startDate") or "",
+                "finishDate": attrs.get("finishDate") or "",
+            })
+        return result
+
     def get_current_iteration(self) -> dict[str, str]:
         """获取当前 Sprint (Iteration)，仅返回覆盖今天日期的 Sprint"""
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
 
-        url = f"{self.team_api_url()}/_apis/work/teamsettings/iterations"
-        # 不用 $timeframe=current（Azure DevOps 在无匹配时会回退到最近一个过去的 Sprint）
-        # 拉全部迭代，自己过滤
-        resp = self._request("GET", url, params={"api-version": "7.1"})
-        resp.raise_for_status()
-        data = resp.json()
-        iterations = data.get("value", [])
+        iterations = self.get_all_iterations()
 
         # 只保留 startDate <= now <= finishDate 的 Sprint
         matching = []
         for it in iterations:
-            attrs = it.get("attributes", {})
-            start = attrs.get("startDate")
-            finish = attrs.get("finishDate")
+            start = it.get("startDate")
+            finish = it.get("finishDate")
             if start and finish:
                 try:
                     start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))

@@ -279,6 +279,14 @@ def main():
 
     def check_and_cache():
         try:
+            # 拉取该团队所有迭代列表（供前端 sprint 下拉使用）
+            try:
+                all_iters = client.get_all_iterations()
+                from web import update_cached_iterations
+                update_cached_iterations(all_iters)
+            except Exception as e:
+                logger.warning("获取迭代列表失败，sprint 下拉可能不完整: %s", e)
+
             result = check_once(client, assigned_to=assigned_to, filter_by_user=False)
         except Exception as e:
             logger.error("check_once 发生未预期异常: %s", e, exc_info=True)
@@ -325,12 +333,13 @@ def main():
     # ── Web UI ──
 
     # 设置 Web 配置
-    from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback
+    from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback, set_azure_devops_client
     from ai_fix import set_timeout as ai_set_timeout
     set_web_query_states(config.QUERY_STATES)
     set_web_work_dir(config.WORK_DIR)
     set_web_access_token(config.WEB_ACCESS_TOKEN)
     set_refresh_callback(check_and_cache)
+    set_azure_devops_client(client)
     ai_set_timeout(config.AI_FIX_TIMEOUT_SECONDS)
 
     # 确定监听地址

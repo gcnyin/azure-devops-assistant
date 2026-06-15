@@ -1,6 +1,7 @@
 """
 SQLite 持久化层 — 记录每次拉取的 Sprint 卡片，支持对比差异
 """
+import os
 import sqlite3
 import json
 from datetime import datetime
@@ -10,7 +11,7 @@ from utils import get_logger
 
 logger = get_logger(__name__)
 
-DB_PATH = Path(__file__).parent / "sprint_history.db"
+DB_PATH = Path(os.environ.get("SPRINT_DB_PATH", "")) if os.environ.get("SPRINT_DB_PATH") else Path(__file__).parent / "sprint_history.db"
 
 
 def _connect() -> sqlite3.Connection:

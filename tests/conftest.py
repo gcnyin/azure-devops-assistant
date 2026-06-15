@@ -13,6 +13,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 @pytest.fixture(autouse=True)
+def _isolate_db(monkeypatch, tmp_path):
+    """每个测试使用独立的临时数据库，避免污染生产数据和测试间交叉污染"""
+    test_db = tmp_path / "test_sprint_history.db"
+    # 需要在 db 模块被导入前设置环境变量，而 db 已被某些模块间接触发
+    # 因此直接 monkeypatch DB_PATH
+    import db
+    monkeypatch.setattr(db, "DB_PATH", test_db)
+    db.init_db()
+    return test_db
+
+
+@pytest.fixture(autouse=True)
 def _disable_dotenv(monkeypatch):
     """禁止测试中加载 .env 文件，确保环境变量隔离"""
     import config

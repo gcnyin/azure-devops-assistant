@@ -38,6 +38,12 @@ _cached_data: dict[str, Any] = {
     "error": "",
 }
 
+# ── Cached iterations list (all sprints for the current team, from Azure DevOps API) ──
+_cached_iterations: list[dict[str, str]] = []
+
+# ── Azure DevOps client reference (set by main.py at startup) ──
+_azure_client = None
+
 # ── Query states list (set by main.py at startup) ──
 _expected_query_states: list[str] = ["To Do", "In Progress", "Active", "New", "Committed"]
 
@@ -70,6 +76,19 @@ def set_web_access_token(token: str):
 def set_refresh_callback(cb):
     global _refresh_callback
     _refresh_callback = cb
+
+
+def set_azure_devops_client(client):
+    """注入 Azure DevOps 客户端，供按需查询历史 Sprint 时使用"""
+    global _azure_client
+    _azure_client = client
+
+
+def update_cached_iterations(iterations: list[dict[str, str]]):
+    """缓存该团队下所有 Iteration（由 main.py 在每次 fetch_data 后调用）"""
+    global _cached_iterations
+    with _data_lock:
+        _cached_iterations = list(iterations)
 
 
 # ── Flask App ──
@@ -159,38 +178,74 @@ def api_config():
 
 @app.route("/api/sprints")
 def api_sprints():
-    """返回所有 Sprint 名称列表，供下拉选择器使用。"""
+    """返回该团队所有 Sprint 列表，供下拉选择器使用。
+
+    数据来源优先级：
+    1. Azure DevOps API 缓存的迭代列表（主源）
+    2. 数据库中的快照记录（API 缓存为空时的回退，或补漏）
+    """
     try:
         from db import _connect
-        import json as _json
+        current_data = get_cached_data()
+        team_name = current_data.get("team_name", "")
+        current_sprint = current_data.get("iteration", {}).get("name", "")
+
+        # 从数据库获取已有快照的 sprint 及其数量
         with _connect() as conn:
-            rows = conn.execute(
-                "SELECT sprint_name, team_name, MAX(id) as latest_id, COUNT(*) as snapshot_count "
-                "FROM sprint_snapshot "
-                "GROUP BY sprint_name, team_name "
-                "ORDER BY latest_id DESC"
-            ).fetchall()
-            sprints = []
-            for r in rows:
+            if team_name:
+                rows = conn.execute(
+                    "SELECT sprint_name, COUNT(*) as snapshot_count "
+                    "FROM sprint_snapshot "
+                    "WHERE team_name = ? "
+                    "GROUP BY sprint_name",
+                    (team_name,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT sprint_name, COUNT(*) as snapshot_count "
+                    "FROM sprint_snapshot "
+                    "GROUP BY sprint_name"
+                ).fetchall()
+            db_counts: dict[str, int] = {r["sprint_name"]: r["snapshot_count"] for r in rows}
+
+        # 从缓存迭代列表构建 sprints
+        with _data_lock:
+            all_iterations = list(_cached_iterations)
+
+        sprints = []
+        seen = set()
+
+        if all_iterations:
+            # 主源：Azure DevOps API 返回的迭代列表
+            for it in all_iterations:
+                name = it["name"]
+                if name in seen:
+                    continue
+                seen.add(name)
                 sprints.append({
-                    "sprint_name": r["sprint_name"],
-                    "team_name": r["team_name"],
-                    "snapshot_count": r["snapshot_count"],
+                    "sprint_name": name,
+                    "team_name": team_name,
+                    "snapshot_count": db_counts.get(name, 0),
                 })
-            # 同时加入当前活跃 Sprint（如果不在历史中）
-            current_data = get_cached_data()
-            current_sprint = current_data.get("iteration", {}).get("name", "")
-            current_team = current_data.get("team_name", "")
-            if current_sprint and not any(
-                s["sprint_name"] == current_sprint and s["team_name"] == current_team
-                for s in sprints
-            ):
-                sprints.insert(0, {
-                    "sprint_name": current_sprint,
-                    "team_name": current_team,
-                    "snapshot_count": 0,
+        else:
+            # 回退：API 缓存为空时，从数据库获取
+            for sprint_name, count in db_counts.items():
+                seen.add(sprint_name)
+                sprints.append({
+                    "sprint_name": sprint_name,
+                    "team_name": team_name,
+                    "snapshot_count": count,
                 })
-            return jsonify({"sprints": sprints, "current_sprint": current_sprint})
+
+        # 确保当前 Sprint 在列表中
+        if current_sprint and current_sprint not in seen:
+            sprints.insert(0, {
+                "sprint_name": current_sprint,
+                "team_name": team_name,
+                "snapshot_count": db_counts.get(current_sprint, 0),
+            })
+
+        return jsonify({"sprints": sprints, "current_sprint": current_sprint})
     except Exception as e:
         logger.error("Failed to load sprints: %s", e)
         return jsonify({"error": str(e)}), 500
@@ -201,10 +256,20 @@ def _build_board_from_snapshot(sprint_name: str) -> dict | None:
     from db import _connect
     import json as _json
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM sprint_snapshot WHERE sprint_name = ? ORDER BY id DESC LIMIT 1",
-            (sprint_name,),
-        ).fetchone()
+        # 优先用 team_name 过滤，避免多团队同名 Sprint 混淆
+        team_name = get_cached_data().get("team_name", "")
+        row = None
+        if team_name:
+            row = conn.execute(
+                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? AND team_name = ? ORDER BY id DESC LIMIT 1",
+                (sprint_name, team_name),
+            ).fetchone()
+        if not row:
+            # 回退：不按 team 过滤
+            row = conn.execute(
+                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? ORDER BY id DESC LIMIT 1",
+                (sprint_name,),
+            ).fetchone()
         if not row:
             return None
         try:
@@ -231,6 +296,55 @@ def _build_board_from_snapshot(sprint_name: str) -> dict | None:
         }
 
 
+def _build_board_live(sprint_name: str) -> dict | None:
+    """通过 Azure DevOps API 实时拉取指定 Sprint 的数据。"""
+    global _azure_client
+    if _azure_client is None:
+        return None
+
+    # 从缓存的迭代列表中查找该 Sprint 的 path
+    with _data_lock:
+        iterations = list(_cached_iterations)
+    sprint_path = ""
+    sprint_start = ""
+    sprint_finish = ""
+    for it in iterations:
+        if it["name"] == sprint_name:
+            sprint_path = it["path"]
+            sprint_start = it.get("startDate", "")
+            sprint_finish = it.get("finishDate", "")
+            break
+
+    if not sprint_path:
+        return None
+
+    try:
+        items = _azure_client.query_work_items(iteration_path=sprint_path, states=None)
+    except Exception as e:
+        logger.error("实时拉取 Sprint '%s' 失败: %s", sprint_name, e)
+        return None
+
+    logger.info("实时拉取 Sprint '%s' 完成: %d 项", sprint_name, len(items))
+    return {
+        "iteration": {
+            "id": "",
+            "name": sprint_name,
+            "path": sprint_path,
+            "startDate": (sprint_start or "")[:10],
+            "finishDate": (sprint_finish or "")[:10],
+        },
+        "items": items,
+        "diff_info": None,
+        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "assigned_to": "",
+        "team_name": get_cached_data().get("team_name", ""),
+        "project": "",
+        "offline": False,
+        "error": "",
+        "view_mode": "all",
+    }
+
+
 @app.route("/api/data")
 def api_data():
     sprint_name = request.args.get("sprint", "")
@@ -241,8 +355,15 @@ def api_data():
     if sprint_name and sprint_name != current_sprint:
         snapshot_data = _build_board_from_snapshot(sprint_name)
         if snapshot_data is None:
+            # 数据库中无快照，尝试实时拉取
+            snapshot_data = _build_board_live(sprint_name)
+        if snapshot_data is None:
             return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
         data = snapshot_data
+        # 沿用当前活跃 Sprint 的 Header 信息，避免切换 Sprint 时跳动
+        data["assigned_to"] = current_data.get("assigned_to", "")
+        data["project"] = current_data.get("project", "")
+        data["team_name"] = current_data.get("team_name", data.get("team_name", ""))
     else:
         data = current_data
 
