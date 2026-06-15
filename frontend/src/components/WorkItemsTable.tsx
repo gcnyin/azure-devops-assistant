@@ -2,9 +2,9 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel, flexRender,
   type ColumnDef, type SortingState,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { getStateColor } from "@/lib/state-color";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
@@ -22,6 +22,126 @@ interface WorkItemsTableProps {
   onViewFix?: (bugId: number) => void;
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+function elapsed(start: string | null | undefined, now: number): number {
+  if (!start) return 0;
+  const t = new Date(start.replace(" ", "T") + "Z").getTime();
+  if (isNaN(t)) return 0;
+  return Math.max(0, Math.floor((now - t) / 1000));
+}
+
+function StatusDot({ className }: { className: string }) {
+  return <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${className}`} />;
+}
+
+function ClickableFix({ status, item, onTriggerFix, onViewFix }: {
+  status: string | null | undefined;
+  item: WorkItem;
+  onTriggerFix?: (bugId: number) => void;
+  onViewFix?: (bugId: number) => void;
+}) {
+  const isClickable = !status || status === "completed" || status === "failed";
+  const Component = isClickable ? "button" : "span";
+  const props: any = { className: "inline-flex items-center gap-1.5 text-[13px] group" };
+
+  if (isClickable) {
+    props.type = "button";
+    props.onClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!status) onTriggerFix?.(item.id);
+      else if (status === "completed") onViewFix?.(item.id);
+      else if (status === "failed") onTriggerFix?.(item.id);
+    };
+  }
+
+  const dotClass = !status
+    ? "border border-dashed border-ink-soft/50 bg-transparent"
+    : status === "pending"
+      ? "bg-ink-soft/40"
+      : status === "running"
+        ? "bg-accent-amber animate-pulse w-2.5 h-2.5"
+        : status === "completed"
+          ? "bg-success"
+          : "bg-error";
+
+  const linkClass = "text-[13px] underline-offset-2 group-hover:underline cursor-pointer";
+
+  if (!status) {
+    return (
+      <Component {...props}>
+        <StatusDot className={dotClass} />
+        <span className={linkClass}>Fix</span>
+      </Component>
+    );
+  }
+
+  if (status === "pending") {
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+      const timer = setInterval(() => setNow(Date.now()), 60000);
+      return () => clearInterval(timer);
+    }, []);
+    const sec = elapsed(item.fix_created_at, now);
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Component {...props}>
+            <StatusDot className={dotClass} />
+            <span className="text-ink-soft text-[13px]">Waiting...</span>
+          </Component>
+        </TooltipTrigger>
+        <TooltipContent>Queued for {formatDuration(sec)}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  if (status === "running") {
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+      const timer = setInterval(() => setNow(Date.now()), 60000);
+      return () => clearInterval(timer);
+    }, []);
+    const sec = elapsed(item.fix_started_at, now);
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Component {...props}>
+            <StatusDot className={dotClass} />
+            <span className="text-ink-soft text-[13px]">AI working...</span>
+          </Component>
+        </TooltipTrigger>
+        <TooltipContent>AI working for {formatDuration(sec)}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  if (status === "completed") {
+    return (
+      <Component {...props}>
+        <StatusDot className={dotClass} />
+        <span className={linkClass}>View fix</span>
+      </Component>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <Component {...props}>
+        <StatusDot className={dotClass} />
+        <span className={linkClass}>Retry fix</span>
+      </Component>
+    );
+  }
+
+  return null;
+}
+
 function FixCell({ item, onTriggerFix, onViewFix }: {
   item: WorkItem;
   onTriggerFix?: (bugId: number) => void;
@@ -30,63 +150,16 @@ function FixCell({ item, onTriggerFix, onViewFix }: {
   const isBug = (item.type || "").toLowerCase() === "bug";
   if (!isBug) return null;
 
-  const status = item._fix_status;
-
-  if (!status) {
-    return (
-      <Button
-        variant="link" size="sm" className="h-auto px-0"
-        onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
-      >
-        Fix
-      </Button>
-    );
-  }
-
-  if (status === "pending") {
-    return <span className="text-ink-soft/60 text-[13px]">Queued...</span>;
-  }
-
-  if (status === "running") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[13px]">
-        <span className="inline-block w-2 h-2 rounded-full bg-accent-amber animate-pulse flex-shrink-0" />
-        <span className="text-ink-soft">Running...</span>
-      </span>
-    );
-  }
-
-  if (status === "completed") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[13px]">
-        <span className="inline-block w-2 h-2 rounded-full bg-success flex-shrink-0" />
-        <span className="text-ink-soft">Done</span>
-        <Button
-          variant="link" size="sm" className="h-auto px-0"
-          onClick={(e) => { e.stopPropagation(); onViewFix?.(item.id); }}
-        >
-          View
-        </Button>
-      </span>
-    );
-  }
-
-  if (status === "failed") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[13px]">
-        <span className="inline-block w-2 h-2 rounded-full bg-error flex-shrink-0" />
-        <span className="text-ink-soft">Failed</span>
-        <Button
-          variant="link" size="sm" className="h-auto px-0"
-          onClick={(e) => { e.stopPropagation(); onTriggerFix?.(item.id); }}
-        >
-          Retry
-        </Button>
-      </span>
-    );
-  }
-
-  return null;
+  return (
+    <TooltipProvider>
+      <ClickableFix
+        status={item.fix_status}
+        item={item}
+        onTriggerFix={onTriggerFix}
+        onViewFix={onViewFix}
+      />
+    </TooltipProvider>
+  );
 }
 
 export function WorkItemsTable({
@@ -141,7 +214,7 @@ export function WorkItemsTable({
 
   if (showFixColumn) {
     columns.push({
-      id: "fix", header: "AI Fix", size: 100, enableSorting: false,
+      id: "fix", header: "AI Fix", size: 100, minSize: 110, enableSorting: false,
       cell: ({ row: tr }) => (
         <FixCell item={tr.original} onTriggerFix={onTriggerFix} onViewFix={onViewFix} />
       ),

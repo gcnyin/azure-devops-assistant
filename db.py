@@ -223,14 +223,22 @@ def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = No
 
 
 def get_bug_fix_status_map() -> dict[int, dict]:
-    """返回 {bug_id: {status, task_id}}，取每个 bug 最新任务的状态"""
+    """返回 {bug_id: {status, task_id, created_at, started_at}}，取每个 bug 最新任务的信息"""
     try:
         with _connect() as conn:
             rows = conn.execute(
-                "SELECT bug_id, id, status FROM fix_tasks "
+                "SELECT bug_id, id, status, created_at, started_at FROM fix_tasks "
                 "WHERE id IN (SELECT MAX(id) FROM fix_tasks GROUP BY bug_id)"
             ).fetchall()
-            return {r["bug_id"]: {"status": r["status"], "task_id": r["id"]} for r in rows}
+            return {
+                r["bug_id"]: {
+                    "status": r["status"],
+                    "task_id": r["id"],
+                    "created_at": r["created_at"],
+                    "started_at": r["started_at"],
+                }
+                for r in rows
+            }
     except Exception:
         return {}
 

@@ -136,7 +136,14 @@ def api_data():
     for it in items:
         it_copy = dict(it)
         status_info = fix_status_map.get(it["id"])
-        it_copy["_fix_status"] = status_info["status"] if status_info else None
+        if status_info:
+            it_copy["fix_status"] = status_info["status"]
+            it_copy["fix_created_at"] = status_info["created_at"]
+            it_copy["fix_started_at"] = status_info["started_at"]
+        else:
+            it_copy["fix_status"] = None
+            it_copy["fix_created_at"] = None
+            it_copy["fix_started_at"] = None
         items_with_status.append(it_copy)
 
     return jsonify({

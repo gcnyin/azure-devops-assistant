@@ -8,7 +8,9 @@ export interface WorkItem {
   htmlUrl?: string;
   _state_changed?: boolean;
   _prev_state?: string;
-  _fix_status?: string | null;
+  fix_status?: string | null;
+  fix_created_at?: string | null;
+  fix_started_at?: string | null;
 }
 
 export interface Iteration {
