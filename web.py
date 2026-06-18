@@ -18,7 +18,7 @@ from db import (
     get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
     list_sprint_summaries, load_latest_snapshot_by_sprint,
 )
-from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, set_timeout as ai_set_timeout, add_finish_callback
+from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir
 from utils import get_logger
 
 logger = get_logger(__name__)
