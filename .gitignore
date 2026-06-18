@@ -56,3 +56,8 @@ my_sprint.*
 .ai-controller-backups
 AI-CHANGELOG.md
 *.bak
+
+# AI 自迭代控制器 生成文件
+AI-TASKS.md
+ai-controller.log
+.ai-controller-backups/
