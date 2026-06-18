@@ -33,8 +33,6 @@ def init_db():
                 work_items_json TEXT NOT NULL
             )
         """)
-        # 删除旧 ai_fixes 表（schema 已重新设计）
-        conn.execute("DROP TABLE IF EXISTS ai_fixes")
         # 尝试添加新列（如果表已存在但缺字段）
         for col, col_def in [
             ("repo_results", "TEXT"),
