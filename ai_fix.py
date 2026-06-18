@@ -536,10 +536,14 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
         ("codex", lambda p: ["codex", "exec", p]),
     ]
 
+    last_error = None
+    last_agent = None
+
     for name, build_args in candidates:
         exe = shutil.which(name)
         if not exe:
             continue
+        last_agent = name
         logger.info("调用 AI agent [%s] 生成修复...", name)
         try:
             result = subprocess.run(
@@ -555,14 +559,19 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
                 return f"[agent: {name}]\n\n{output}", name, None
             else:
                 logger.warning("AI agent [%s] 返回空输出", name)
+                last_error = f"agent [{name}] 返回空输出"
                 continue
         except subprocess.TimeoutExpired:
             logger.warning("AI agent [%s] 超时（%d秒）", name, _timeout_seconds)
+            last_error = f"agent [{name}] 执行超时（{_timeout_seconds}秒）"
             continue
         except Exception:
             logger.warning("AI agent [%s] 执行异常", name, exc_info=True)
+            last_error = f"agent [{name}] 执行异常"
             continue
 
+    if last_error:
+        return None, last_agent, last_error
     return None, None, "无可用的 AI agent"
 
 

@@ -167,7 +167,9 @@ class TestTryAgent:
 
     def test_agent_timeout_handled(self, mocker):
         """agent 执行超时时返回超时信息"""
-        mocker.patch("shutil.which", return_value="/usr/local/bin/pi")
+        def which_side_effect(cmd):
+            return "/usr/local/bin/pi" if cmd == "pi" else None
+        mocker.patch("shutil.which", side_effect=which_side_effect)
         mocker.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("pi", 300))
 
         from ai_fix import _try_agent
@@ -179,7 +181,9 @@ class TestTryAgent:
 
     def test_agent_empty_output(self, mocker):
         """agent 返回空输出时记录警告"""
-        mocker.patch("shutil.which", return_value="/usr/local/bin/pi")
+        def which_side_effect(cmd):
+            return "/usr/local/bin/pi" if cmd == "pi" else None
+        mocker.patch("shutil.which", side_effect=which_side_effect)
         mock_run = mocker.patch("subprocess.run")
         mock_run.return_value = mocker.MagicMock(stdout="", stderr="")
         mock_logger = mocker.patch("ai_fix.logger.warning")
@@ -289,7 +293,7 @@ class TestEnqueueFixTasks:
         """worker 循环跳过已被取消的任务"""
         from ai_fix import _worker_loop, _task_queue
 
-        mock_get = mocker.patch("db.get_fix_tasks", return_value=[{"id": 1, "status": "cancelled"}])
+        mock_get = mocker.patch("ai_fix.get_fix_tasks", return_value=[{"id": 1, "status": "cancelled"}])
         mock_process = mocker.patch("ai_fix._process_one")
 
         bug = {"id": 999, "title": "Cancelled Bug"}
