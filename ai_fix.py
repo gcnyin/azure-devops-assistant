@@ -549,10 +549,10 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
                 return f"[agent: {name}]\n\n{output}", name, None
             else:
                 logger.warning("AI agent [%s] 返回空输出", name)
-                return None, name, f"Agent [{name}] 返回空输出"
+                continue
         except subprocess.TimeoutExpired:
             logger.warning("AI agent [%s] 超时（%d秒）", name, _timeout_seconds)
-            return None, name, f"Agent [{name}] 超时（{_timeout_seconds}秒）"
+            continue
         except Exception:
             logger.warning("AI agent [%s] 执行异常", name, exc_info=True)
             continue
