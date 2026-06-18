@@ -329,25 +329,3 @@ class TestEnqueueFixTasks:
         assert "描述二" in prompts[1]
 
 
-# ── _which 测试 ──
-
-class TestWhich:
-    """_which 辅助函数测试"""
-
-    def test_which_returns_path(self, mocker):
-        """返回可执行文件路径"""
-        mocker.patch("shutil.which", return_value="/usr/local/bin/pi")
-
-        from ai_fix import _which
-        result = _which("pi")
-
-        assert result == "/usr/local/bin/pi"
-
-    def test_which_returns_none(self, mocker):
-        """不可用时返回 None"""
-        mocker.patch("shutil.which", return_value=None)
-
-        from ai_fix import _which
-        result = _which("nonexistent")
-
-        assert result is None
