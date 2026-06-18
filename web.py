@@ -17,6 +17,7 @@ from db import (
     list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
     get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
     list_sprint_summaries, load_latest_snapshot_by_sprint,
+    save_snapshot,
 )
 from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir
 from utils import get_logger
@@ -310,6 +311,8 @@ def _build_board_live(sprint_name: str) -> dict | None:
         return None
 
     logger.info("实时拉取 Sprint '%s' 完成: %d 项", sprint_name, len(items))
+    team = get_cached_data().get("team_name", "")
+    save_snapshot(sprint_name, team, items)
     return _make_board_data(
         iteration={
             "id": "",
