@@ -13,7 +13,6 @@ from typing import Any
 
 from flask import Flask, jsonify, request, Response, send_file
 
-from renderer import STATE_COLORS_HEX
 from db import (
     list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
     get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
@@ -23,6 +22,21 @@ from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, set_timeo
 from utils import get_logger
 
 logger = get_logger(__name__)
+
+# ponytail: was renderer.py — single dict, inlined to save a file
+STATE_COLORS_HEX: dict[str, str] = {
+    "done": "#59d499",
+    "closed": "#59d499",
+    "completed": "#59d499",
+    "resolved": "#3aad7f",
+    "in progress": "#ffc533",
+    "active": "#ffc533",
+    "committed": "#e5a81c",
+    "to do": "#57c1ff",
+    "new": "#57c1ff",
+    "removed": "#ff6161",
+    "blocked": "#ff6161",
+}
 
 # ── Global data cache (updated by main.py) ──
 _data_lock = threading.Lock()
