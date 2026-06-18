@@ -2,7 +2,6 @@
 通知模块 — 检测到变化时发送桌面通知或 Webhook
 """
 
-import json
 import platform
 import shutil
 import subprocess
