@@ -16,11 +16,6 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 
-def _default_config() -> Config:
-    """返回默认的 Config 实例（从环境变量读取），作为延迟创建的兜底"""
-    return Config()
-
-
 def _strip_html(html: str) -> str:
     """去掉 HTML 标签，保留纯文本"""
     text = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
@@ -45,7 +40,7 @@ class AzureDevOpsClient:
 
     def __init__(self, config: Config | None = None):
         if config is None:
-            config = _default_config()
+            config = Config()
         self.config: Config = config
         self._session = requests.Session()
         # Basic Auth: 用户名留空，PAT 作为密码
