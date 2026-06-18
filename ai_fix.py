@@ -192,45 +192,23 @@ def _build_branch_name(bug: dict) -> str:
     return f"ai-fix/{bug['id']}-{ts}"
 
 
-def _parse_analysis_result(output: str) -> dict | None:
-    """从 AI agent 输出中解析 ---ANALYSIS--- JSON 块"""
-    m = re.search(r'---ANALYSIS---\s*\n(.*?)(?:\n\s*```)?\s*$', output, re.DOTALL)
+def _parse_result_block(output: str, marker: str) -> dict | None:
+    """从 AI agent 输出中解析 ---{marker}--- JSON 块"""
+    m = re.search(rf'---{re.escape(marker)}---\s*\n(.*?)(?:\n\s*```)?\s*$', output, re.DOTALL)
     if not m:
-        m = re.search(r'---ANALYSIS---\s*\n?(\{.*)', output, re.DOTALL)
+        m = re.search(rf'---{re.escape(marker)}---\s*\n?(\{{.*)', output, re.DOTALL)
     if not m:
-        logger.warning("AI 输出中未找到 ---ANALYSIS--- 标记")
+        logger.warning("AI 输出中未找到 ---%s--- 标记", marker)
         return None
     json_str = m.group(1).strip()
     json_str = re.sub(r'^```(?:json)?\s*', '', json_str)
     json_str = re.sub(r'\s*```$', '', json_str)
     try:
         result = json.loads(json_str)
-        logger.info("解析 ANALYSIS 成功: target_repos=%s", result.get("target_repos", []))
+        logger.info("解析 %s 成功", marker)
         return result
     except json.JSONDecodeError as e:
-        logger.warning("ANALYSIS JSON 解析失败: %s", e)
-        return None
-
-
-def _parse_fix_result(output: str) -> dict | None:
-    """从 AI agent 输出中解析 ---FIX_RESULT--- JSON 块"""
-    m = re.search(r'---FIX_RESULT---\s*\n(.*?)(?:\n\s*```)?\s*$', output, re.DOTALL)
-    if not m:
-        m = re.search(r'---FIX_RESULT---\s*\n?(\{.*)', output, re.DOTALL)
-    if not m:
-        logger.warning("AI 输出中未找到 ---FIX_RESULT--- 标记")
-        return None
-    json_str = m.group(1).strip()
-    # 如果被 markdown 代码块包裹，去掉 ```
-    json_str = re.sub(r'^```(?:json)?\s*', '', json_str)
-    json_str = re.sub(r'\s*```$', '', json_str)
-    try:
-        result = json.loads(json_str)
-        logger.info("解析 FIX_RESULT 成功: success=%s, repos=%d",
-                     result.get("success"), len(result.get("repos", [])))
-        return result
-    except json.JSONDecodeError as e:
-        logger.warning("FIX_RESULT JSON 解析失败: %s", e)
+        logger.warning("%s JSON 解析失败: %s", marker, e)
         return None
 
 
@@ -320,7 +298,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         logger.warning("任务 #%d 分析阶段失败: %s", task_id, analysis_error)
         return
 
-    analysis_result = _parse_analysis_result(analysis_response)
+    analysis_result = _parse_result_block(analysis_response, 'ANALYSIS')
     if not analysis_result or not analysis_result.get("target_repos"):
         _restore_repos(repo_states)
         update_fix_task_status(
@@ -372,7 +350,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
     # ── 步骤 6: 解析修复结果 ──
     fix_result = None
     if response is not None:
-        fix_result = _parse_fix_result(response)
+        fix_result = _parse_result_block(response, 'FIX_RESULT')
 
     # ── 步骤 7: push + 创建 PR ──
     pr_results = []
