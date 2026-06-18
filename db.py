@@ -332,3 +332,51 @@ def load_snapshot_by_id(snapshot_id: int) -> tuple[list[dict], dict] | None:
             "fetched_at": row["fetched_at"],
         }
         return items, meta
+
+
+def list_sprint_summaries(team_name: str | None = None) -> list[dict[str, str | int]]:
+    """返回每个 Sprint 的快照计数摘要。"""
+    with _connect() as conn:
+        if team_name:
+            rows = conn.execute(
+                "SELECT sprint_name, COUNT(*) as snapshot_count "
+                "FROM sprint_snapshot WHERE team_name = ? "
+                "GROUP BY sprint_name",
+                (team_name,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT sprint_name, COUNT(*) as snapshot_count "
+                "FROM sprint_snapshot GROUP BY sprint_name"
+            ).fetchall()
+        return [{"sprint_name": r["sprint_name"], "snapshot_count": r["snapshot_count"]} for r in rows]
+
+
+def load_latest_snapshot_by_sprint(sprint_name: str, team_name: str | None = None) -> tuple[list[dict], dict] | None:
+    """加载指定 Sprint 的最新快照，返回 (items, meta)。
+    team_name 可选但推荐传入以避免多团队同名 Sprint 混淆。"""
+    with _connect() as conn:
+        row = None
+        if team_name:
+            row = conn.execute(
+                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? AND team_name = ? ORDER BY id DESC LIMIT 1",
+                (sprint_name, team_name),
+            ).fetchone()
+        if not row:
+            row = conn.execute(
+                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? ORDER BY id DESC LIMIT 1",
+                (sprint_name,),
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            items = json.loads(row["work_items_json"])
+        except (json.JSONDecodeError, TypeError):
+            items = []
+        meta = {
+            "id": row["id"],
+            "sprint_name": row["sprint_name"],
+            "team_name": row["team_name"],
+            "fetched_at": row["fetched_at"],
+        }
+        return items, meta

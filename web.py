@@ -17,6 +17,7 @@ from renderer import STATE_COLORS_HEX
 from db import (
     list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
     get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
+    list_sprint_summaries, load_latest_snapshot_by_sprint,
 )
 from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, set_timeout as ai_set_timeout, add_finish_callback
 from utils import get_logger
@@ -184,28 +185,13 @@ def api_sprints():
     2. 数据库中的快照记录（API 缓存为空时的回退，或补漏）
     """
     try:
-        from db import _connect
         current_data = get_cached_data()
         team_name = current_data.get("team_name", "")
         current_sprint = current_data.get("iteration", {}).get("name", "")
 
         # 从数据库获取已有快照的 sprint 及其数量
-        with _connect() as conn:
-            if team_name:
-                rows = conn.execute(
-                    "SELECT sprint_name, COUNT(*) as snapshot_count "
-                    "FROM sprint_snapshot "
-                    "WHERE team_name = ? "
-                    "GROUP BY sprint_name",
-                    (team_name,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT sprint_name, COUNT(*) as snapshot_count "
-                    "FROM sprint_snapshot "
-                    "GROUP BY sprint_name"
-                ).fetchall()
-            db_counts: dict[str, int] = {r["sprint_name"]: r["snapshot_count"] for r in rows}
+        summaries = list_sprint_summaries(team_name or None)
+        db_counts: dict[str, int] = {s["sprint_name"]: s["snapshot_count"] for s in summaries}
 
         # 从缓存迭代列表构建 sprints
         with _data_lock:
@@ -268,35 +254,17 @@ def _make_board_data(*, iteration, items, last_update, team_name):
 
 def _build_board_from_snapshot(sprint_name: str) -> dict | None:
     """从最新快照构建 BoardData 格式。"""
-    from db import _connect
-    import json as _json
-    with _connect() as conn:
-        # 优先用 team_name 过滤，避免多团队同名 Sprint 混淆
-        team_name = get_cached_data().get("team_name", "")
-        row = None
-        if team_name:
-            row = conn.execute(
-                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? AND team_name = ? ORDER BY id DESC LIMIT 1",
-                (sprint_name, team_name),
-            ).fetchone()
-        if not row:
-            # 回退：不按 team 过滤
-            row = conn.execute(
-                "SELECT * FROM sprint_snapshot WHERE sprint_name = ? ORDER BY id DESC LIMIT 1",
-                (sprint_name,),
-            ).fetchone()
-        if not row:
-            return None
-        try:
-            items = _json.loads(row["work_items_json"])
-        except (_json.JSONDecodeError, TypeError):
-            items = []
-        return _make_board_data(
-            iteration={"id": "", "name": row["sprint_name"], "path": "", "startDate": "", "finishDate": ""},
-            items=items,
-            last_update=row["fetched_at"],
-            team_name=row["team_name"],
-        )
+    team_name = get_cached_data().get("team_name", "") or None
+    result = load_latest_snapshot_by_sprint(sprint_name, team_name)
+    if result is None:
+        return None
+    items, meta = result
+    return _make_board_data(
+        iteration={"id": "", "name": meta["sprint_name"], "path": "", "startDate": "", "finishDate": ""},
+        items=items,
+        last_update=meta["fetched_at"],
+        team_name=meta["team_name"],
+    )
 
 
 def _build_board_live(sprint_name: str) -> dict | None:
