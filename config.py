@@ -55,6 +55,11 @@ class Config:
             or os.getenv("AI_FIX_TIMEOUT_SECONDS", "300")
         )
 
+        # AI 修复目标分支（用于 checkout/pull/PR base），默认 develop
+        self.TARGET_BRANCH: str = (
+            kwargs.get("TARGET_BRANCH") or os.getenv("AZURE_DEVOPS_TARGET_BRANCH", "develop")
+        )
+
         # ── 通知配置 ──
         notify_val = kwargs.get("NOTIFY_DESKTOP")
         if notify_val is None:

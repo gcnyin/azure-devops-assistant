@@ -334,13 +334,14 @@ def main():
 
     # 设置 Web 配置
     from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback, set_azure_devops_client
-    from ai_fix import set_timeout as ai_set_timeout
+    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch
     set_web_query_states(config.QUERY_STATES)
     set_web_work_dir(config.WORK_DIR)
     set_web_access_token(config.WEB_ACCESS_TOKEN)
     set_refresh_callback(check_and_cache)
     set_azure_devops_client(client)
     ai_set_timeout(config.AI_FIX_TIMEOUT_SECONDS)
+    ai_set_target_branch(config.TARGET_BRANCH)
 
     # 确定监听地址
     host = "0.0.0.0" if args.public else "127.0.0.1"

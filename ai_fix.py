@@ -29,6 +29,7 @@ _task_queue: queue.Queue = queue.Queue()
 _worker_thread: threading.Thread | None = None
 _work_dir: str = "."
 _timeout_seconds: int = 300
+_target_branch: str = "develop"
 _agent_name: str = ""
 _callbacks: list = []  # 任务完成回调列表
 
@@ -41,6 +42,11 @@ def set_work_dir(work_dir: str):
 def set_timeout(seconds: int):
     global _timeout_seconds
     _timeout_seconds = seconds
+
+
+def set_target_branch(branch: str):
+    global _target_branch
+    _target_branch = branch
 
 
 def add_finish_callback(cb):
@@ -256,8 +262,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         try:
             original_branch = _git_get_current_branch(repo_path)
             stashed = _git_stash(repo_path)
-            _git_checkout(repo_path, "develop")
-            _git_pull(repo_path, "develop")
+            _git_checkout(repo_path, _target_branch)
+            _git_pull(repo_path, _target_branch)
             repo_states.append({
                 "path": repo_path,
                 "original_branch": original_branch,
@@ -477,7 +483,7 @@ def _push_and_create_pr(
         pr_url = az_client.create_pull_request(
             repo_name=repo_name,
             source_branch=branch_name,
-            target_branch="develop",
+            target_branch=_target_branch,
             title=pr_title,
             description=pr_desc,
         )
@@ -575,7 +581,7 @@ Bug ID: {bug['id']}
 Bug 标题: {bug['title']}
 Bug 描述:{desc_block}
 
-可分析的代码仓库（全部已切换到 develop 分支并拉取最新代码）:
+可分析的代码仓库（全部已切换到 {_target_branch} 分支并拉取最新代码）:
 {repo_lines}
 
 要求：
