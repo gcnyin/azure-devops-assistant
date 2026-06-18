@@ -1,15 +1,15 @@
 const DEFAULT_COLORS: Record<string, string> = {
-  done: "#5db872",
-  closed: "#5db872",
-  completed: "#5db872",
-  resolved: "#5db8a6",
-  "in progress": "#e8a55a",
-  active: "#e8a55a",
-  committed: "#c4944a",
-  "to do": "#cc785c",
-  new: "#cc785c",
-  removed: "#c64545",
-  blocked: "#c64545",
+  done: "#59d499",
+  closed: "#59d499",
+  completed: "#59d499",
+  resolved: "#3aad7f",
+  "in progress": "#ffc533",
+  active: "#ffc533",
+  committed: "#e5a81c",
+  "to do": "#57c1ff",
+  new: "#57c1ff",
+  removed: "#ff6161",
+  blocked: "#ff6161",
 };
 
 const FALLBACK_COLOR = "#6c6a64";
