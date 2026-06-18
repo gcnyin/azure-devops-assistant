@@ -250,6 +250,22 @@ def api_sprints():
         return jsonify({"error": str(e)}), 500
 
 
+# ── BoardData factory: single source of truth for the response shape ──
+def _make_board_data(*, iteration, items, last_update, team_name):
+    return {
+        "iteration": iteration,
+        "items": items,
+        "diff_info": None,
+        "last_update": last_update,
+        "assigned_to": "",
+        "team_name": team_name,
+        "project": "",
+        "offline": False,
+        "error": "",
+        "view_mode": "all",
+    }
+
+
 def _build_board_from_snapshot(sprint_name: str) -> dict | None:
     """从最新快照构建 BoardData 格式。"""
     from db import _connect
@@ -275,24 +291,12 @@ def _build_board_from_snapshot(sprint_name: str) -> dict | None:
             items = _json.loads(row["work_items_json"])
         except (_json.JSONDecodeError, TypeError):
             items = []
-        return {
-            "iteration": {
-                "id": "",
-                "name": row["sprint_name"],
-                "path": "",
-                "startDate": "",
-                "finishDate": "",
-            },
-            "items": items,
-            "diff_info": None,
-            "last_update": row["fetched_at"],
-            "assigned_to": "",
-            "team_name": row["team_name"],
-            "project": "",
-            "offline": False,
-            "error": "",
-            "view_mode": "all",
-        }
+        return _make_board_data(
+            iteration={"id": "", "name": row["sprint_name"], "path": "", "startDate": "", "finishDate": ""},
+            items=items,
+            last_update=row["fetched_at"],
+            team_name=row["team_name"],
+        )
 
 
 def _build_board_live(sprint_name: str) -> dict | None:
@@ -324,24 +328,18 @@ def _build_board_live(sprint_name: str) -> dict | None:
         return None
 
     logger.info("实时拉取 Sprint '%s' 完成: %d 项", sprint_name, len(items))
-    return {
-        "iteration": {
+    return _make_board_data(
+        iteration={
             "id": "",
             "name": sprint_name,
             "path": sprint_path,
             "startDate": (sprint_start or "")[:10],
             "finishDate": (sprint_finish or "")[:10],
         },
-        "items": items,
-        "diff_info": None,
-        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "assigned_to": "",
-        "team_name": get_cached_data().get("team_name", ""),
-        "project": "",
-        "offline": False,
-        "error": "",
-        "view_mode": "all",
-    }
+        items=items,
+        last_update=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        team_name=get_cached_data().get("team_name", ""),
+    )
 
 
 @app.route("/api/data")
