@@ -30,10 +30,6 @@ _agent_name: str = ""
 _callbacks: list = []  # 任务完成回调列表
 
 
-def _which(cmd: str) -> str | None:
-    return shutil.which(cmd)
-
-
 def set_work_dir(work_dir: str):
     global _work_dir
     _work_dir = work_dir or "."
@@ -566,7 +562,7 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
     ]
 
     for name, build_args in candidates:
-        exe = _which(name)
+        exe = shutil.which(name)
         if not exe:
             continue
         logger.info("调用 AI agent [%s] 生成修复...", name)

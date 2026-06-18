@@ -1,23 +1,22 @@
 # AI 任务列表
-生成时间: 2026-06-16 02:07:13
-运行次数: 2
-最后运行: 2026-06-16 01:58:12
-全局轮次: 7
+生成时间: 2026-06-18 19:39:41
+运行次数: 1
+最后运行: 2026-06-18 19:39:30
+全局轮次: 1
 
-共 7 个任务
+共 4 个任务
+
+## 待执行
+
+- [ ] **#2** [high] [delete/simplify] Remove ai_fix.py _connect_to_db() duplication, reuse db._connect()
+  ai_fix.py: _connect_to_db() (line 550) duplicates db._connect() but hardcodes DB_PATH, ignoring SPRINT_DB_PATH env var. Replace with import and call to db._connect(). This is structural rot (duplication across modules) and a latent bug if SPRINT_DB_PATH is ever set.
+
+- [ ] **#3** [high] [delete/simplify] Remove dead function notify_fix_tasks_completed and its unused import
+  notifier.py: notify_fix_tasks_completed() (line 169) is never called. web.py: its import at line 22 is unused. Dead code - remove both.
+
+- [ ] **#4** [medium] [refactor] Consolidate ai_fix.py db imports to module level (remove lazy import)
+  ai_fix.py: _worker_loop() does a lazy import db inside function body (line 64) while module-level already imports from db. Move STATUS_CANCELLED and CANCELLABLE_STATUSES to module-level imports, remove the lazy import. Reduces import noise and makes dependency graph explicit.
 
 ## 已完成
 
-- [x] **#13** 前端缺少组件和 hooks 的单元测试 (Round 7, 2026-06-16 02:07)
-
-- [x] **#11** 增加 Sprint 选择器支持多 Sprint 历史浏览 (Round 6, 2026-06-16 02:05)
-
-- [x] **#7** AI fix 入队时存储的 prompt 与实际执行不一致 (Round 5, 2026-06-16 02:03)
-
-- [x] **#5** Web UI 缺少手动刷新按钮 (Round 4, 2026-06-16 02:01)
-
-- [x] **#4** AI 修复任务缺少取消/终止机制 (Round 3, 2026-06-16 02:00)
-
-- [x] **#1** test_server.py 引用不存在的 save_ai_fix 函数 (Round 1, 2026-06-16 01:55)
-
-- [x] **#2** Dockerfile COPY 引用不存在的 templates/ 目录 (Round 2, 2026-06-16 01:55)
+- [x] **#1** Remove _which() pure delegation wrapper, use shutil.which directly (Round 1, 2026-06-18 19:39)
