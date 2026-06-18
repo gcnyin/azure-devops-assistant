@@ -12,7 +12,6 @@ import threading
 
 from azure_devops import AzureDevOpsClient
 from db import (
-    _connect,
     CANCELLABLE_STATUSES,
     create_fix_task, get_fix_tasks, update_fix_task_status,
     STATUS_CANCELLED, STATUS_COMPLETED, STATUS_FAILED,
@@ -31,7 +30,6 @@ _work_dir: str = "."
 _timeout_seconds: int = 300
 _target_branch: str = "develop"
 _agent_name: str = ""
-_callbacks: list = []  # 任务完成回调列表
 
 
 def set_work_dir(work_dir: str):
@@ -47,11 +45,6 @@ def set_timeout(seconds: int):
 def set_target_branch(branch: str):
     global _target_branch
     _target_branch = branch
-
-
-def add_finish_callback(cb):
-    """注册任务完成回调。cb(task_dict) 在任务完成后被调用。"""
-    _callbacks.append(cb)
 
 
 def start_worker():
@@ -430,16 +423,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         logger.warning("任务 #%d 修复阶段失败: %s", task_id, agent_error)
 
-    # ── 触发回调 ──
-    with _connect() as conn:
-        row = conn.execute("SELECT * FROM fix_tasks WHERE id = ?", (task_id,)).fetchone()
-        if row:
-            task_dict = dict(row)
-            for cb in _callbacks:
-                try:
-                    cb(task_dict)
-                except Exception:
-                    logger.exception("任务完成回调异常")
+
 
 
 def _push_and_create_pr(
