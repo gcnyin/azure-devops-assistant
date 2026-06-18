@@ -12,6 +12,7 @@ import threading
 
 from azure_devops import AzureDevOpsClient
 from db import (
+    _connect,
     create_fix_task, update_fix_task_status,
     STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
 )
@@ -445,7 +446,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         logger.warning("任务 #%d 修复阶段失败: %s", task_id, agent_error)
 
     # ── 触发回调 ──
-    with _connect_to_db() as conn:
+    with _connect() as conn:
         row = conn.execute("SELECT * FROM fix_tasks WHERE id = ?", (task_id,)).fetchone()
         if row:
             task_dict = dict(row)
@@ -539,17 +540,6 @@ def _build_pr_description(bug: dict, agent: str | None, fix_result: dict,
         files_str,
     ]
     return "\n".join(lines)
-
-
-# ── 原有辅助函数 ──
-
-def _connect_to_db():
-    import sqlite3
-    from pathlib import Path
-    DB_PATH = Path(__file__).parent / "sprint_history.db"
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
