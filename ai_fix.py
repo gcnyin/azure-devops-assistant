@@ -536,8 +536,8 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
         ("codex", lambda p: ["codex", "exec", p]),
     ]
 
-    last_error = None
-    last_agent = None
+    errors: list[str] = []
+    last_agent: str | None = None
 
     for name, build_args in candidates:
         exe = shutil.which(name)
@@ -558,20 +558,20 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
                 logger.info("AI agent [%s] 返回 %d 字符", name, len(output))
                 return f"[agent: {name}]\n\n{output}", name, None
             else:
-                logger.warning("AI agent [%s] 返回空输出", name)
-                last_error = f"agent [{name}] 返回空输出"
+                logger.warning("AI agent [%s] 返回空输出 (exit code %d)", name, result.returncode)
+                errors.append(f"agent [{name}] 返回空输出 (exit code {result.returncode})")
                 continue
         except subprocess.TimeoutExpired:
             logger.warning("AI agent [%s] 超时（%d秒）", name, _timeout_seconds)
-            last_error = f"agent [{name}] 执行超时（{_timeout_seconds}秒）"
+            errors.append(f"agent [{name}] 执行超时（{_timeout_seconds}秒）")
             continue
-        except Exception:
-            logger.warning("AI agent [%s] 执行异常", name, exc_info=True)
-            last_error = f"agent [{name}] 执行异常"
+        except Exception as e:
+            logger.warning("AI agent [%s] 执行异常: %s", name, e)
+            errors.append(f"agent [{name}] 执行异常: {e}")
             continue
 
-    if last_error:
-        return None, last_agent, last_error
+    if errors:
+        return None, last_agent, "; ".join(errors)
     return None, None, "无可用的 AI agent"
 
 
@@ -681,3 +681,59 @@ def enqueue_fix_tasks(bugs: list[dict], sprint_name: str = "") -> list[int]:
         logger.debug("Bug #%d 已入队, task_id=%d", bug["id"], task_id)
     logger.info("%d 个修复任务已入队", len(task_ids))
     return task_ids
+
+
+# ── 自测 ──
+if __name__ == "__main__":
+    import shutil as _shutil
+    import subprocess as _subprocess
+    from unittest.mock import patch, MagicMock
+
+    _orig_which = _shutil.which
+    _orig_run = _subprocess.run
+    _orig_work_dir = _work_dir
+    _work_dir = "/tmp"
+
+    # 1. 无可用 agent
+    with patch.object(_shutil, 'which', return_value=None):
+        r, a, e = _try_agent("p")
+        assert r is None and a is None and e == "无可用的 AI agent", f"#1: {e}"
+
+    # 2. pi 超时
+    def _mock_which(name):
+        return "/bin/pi" if name == "pi" else None
+    with patch.object(_shutil, 'which', side_effect=_mock_which), \
+         patch.object(_subprocess, 'run', side_effect=_subprocess.TimeoutExpired(cmd=["pi"], timeout=300)):
+        r, a, e = _try_agent("p")
+        assert r is None and a == "pi" and "执行超时" in e and "300" in e, f"#2: {e}"
+
+    # 3. pi 空输出
+    _mock = MagicMock()
+    _mock.stdout = ""; _mock.stderr = ""; _mock.returncode = 1
+    with patch.object(_shutil, 'which', side_effect=_mock_which), \
+         patch.object(_subprocess, 'run', return_value=_mock):
+        r, a, e = _try_agent("p")
+        assert r is None and a == "pi" and "返回空输出" in e and "exit code 1" in e, f"#3: {e}"
+
+    # 4. pi 成功
+    _mock = MagicMock()
+    _mock.stdout = "fixed"; _mock.stderr = ""; _mock.returncode = 0
+    with patch.object(_shutil, 'which', side_effect=_mock_which), \
+         patch.object(_subprocess, 'run', return_value=_mock):
+        r, a, e = _try_agent("p")
+        assert r is not None and a == "pi" and e is None, f"#4: {e}"
+
+    # 5. pi 异常
+    with patch.object(_shutil, 'which', side_effect=_mock_which), \
+         patch.object(_subprocess, 'run', side_effect=OSError("No such file")):
+        r, a, e = _try_agent("p")
+        assert r is None and a == "pi" and "执行异常" in e and "No such file" in e, f"#5: {e}"
+
+    # 6. pi 超时且无其他 agent，不应显示"无可用的 AI agent"
+    with patch.object(_shutil, 'which', side_effect=_mock_which), \
+         patch.object(_subprocess, 'run', side_effect=_subprocess.TimeoutExpired(cmd=["pi"], timeout=300)):
+        r, a, e = _try_agent("p")
+        assert "无可用的 AI agent" not in e, f"#6: {e}"
+
+    _work_dir = _orig_work_dir
+    print("_try_agent 自测: 6/6 通过")
