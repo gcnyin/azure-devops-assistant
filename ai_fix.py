@@ -13,8 +13,10 @@ import threading
 from azure_devops import AzureDevOpsClient
 from db import (
     _connect,
-    create_fix_task, update_fix_task_status,
-    STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
+    CANCELLABLE_STATUSES,
+    create_fix_task, get_fix_tasks, update_fix_task_status,
+    STATUS_CANCELLED, STATUS_COMPLETED, STATUS_FAILED,
+    STATUS_PENDING, STATUS_RUNNING,
 )
 from notifier import notify_pr_created
 from utils import get_logger
@@ -58,7 +60,6 @@ def start_worker():
 
 def _worker_loop():
     """后台循环：从队列取任务，串行处理。处理前检查状态，跳过已取消的任务。"""
-    import db
     while True:
         try:
             task_id, bug, prompt = _task_queue.get()
@@ -66,13 +67,13 @@ def _worker_loop():
             continue
         try:
             # 检查任务是否已被取消
-            tasks = db.get_fix_tasks(bug_id=bug.get("id"))
+            tasks = get_fix_tasks(bug_id=bug.get("id"))
             task_status = None
             for t in tasks:
                 if t["id"] == task_id:
                     task_status = t["status"]
                     break
-            if task_status == db.STATUS_CANCELLED:
+            if task_status == STATUS_CANCELLED:
                 logger.info("任务 #%d 已被取消，跳过处理", task_id)
                 continue
             _process_one(task_id, bug, prompt)
