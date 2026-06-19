@@ -33,14 +33,6 @@ def init_db():
                 work_items_json TEXT NOT NULL
             )
         """)
-        # 尝试添加新列（如果表已存在但缺字段）
-        for col, col_def in [
-            ("repo_results", "TEXT"),
-        ]:
-            try:
-                conn.execute(f"ALTER TABLE fix_tasks ADD COLUMN {col} {col_def}")
-            except Exception:
-                pass  # 列已存在
         conn.execute("""
             CREATE TABLE IF NOT EXISTS fix_tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
