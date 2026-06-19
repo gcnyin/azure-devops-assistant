@@ -94,6 +94,7 @@ export function useFixesMutation() {
       }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixes"] });
+      queryClient.invalidateQueries({ queryKey: ["board"] });
     },
   });
 }
@@ -106,6 +107,7 @@ export function useCancelFixMutation() {
       fetch(`/api/fixes/${taskId}/cancel`, { method: "POST" }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixes"] });
+      queryClient.invalidateQueries({ queryKey: ["board"] });
     },
   });
 }
