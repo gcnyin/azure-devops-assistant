@@ -6,10 +6,12 @@ interface RouteContext {
   incompleteStates: string[];
   stateColors: Record<string, string>;
   boardData?: BoardData;
+  boardError: boolean;
+  boardErrorDetail: Error | null;
 }
 
 export function BoardRoute() {
-  const { incompleteStates, stateColors, boardData } =
+  const { incompleteStates, stateColors, boardData, boardError, boardErrorDetail } =
     useOutletContext<RouteContext>();
 
   return (
@@ -17,6 +19,8 @@ export function BoardRoute() {
       data={boardData}
       incompleteStates={incompleteStates}
       stateColors={stateColors}
+      isError={boardError}
+      error={boardErrorDetail}
     />
   );
 }

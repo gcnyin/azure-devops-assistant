@@ -9,7 +9,7 @@ export function AppLayout() {
   const view = searchParams.get("view") || "all";
   const sprintParam = searchParams.get("sprint") || "";
   const pathname = window.location.pathname;
-  const { data: boardData } = useBoardData(view, sprintParam);
+  const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData(view, sprintParam);
   const { data: config } = useConfig();
   const { data: sprintsData } = useSprints();
 
@@ -75,6 +75,8 @@ export function AppLayout() {
           incompleteStates: config?.incomplete_states || [],
           stateColors: config?.state_colors || {},
           boardData,
+          boardError,
+          boardErrorDetail,
         }}
       />
     </div>

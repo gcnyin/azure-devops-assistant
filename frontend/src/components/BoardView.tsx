@@ -18,9 +18,11 @@ interface BoardViewProps {
   data?: BoardData;
   incompleteStates: string[];
   stateColors: Record<string, string>;
+  isError?: boolean;
+  error?: Error | null;
 }
 
-export function BoardView({ data, incompleteStates, stateColors }: BoardViewProps) {
+export function BoardView({ data, incompleteStates, stateColors, isError, error }: BoardViewProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const view = searchParams.get("view") || "all";
@@ -111,6 +113,7 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
   return (
     <div>
       {data?.error && <ErrorBanner message={data.error} />}
+      {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load board data"} />}
 
       <div className="flex items-center gap-1 mb-6">
         <span className="text-sm text-ink-muted mr-1">View:</span>
@@ -222,7 +225,7 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
       </div>
 
       <div className="table-wrap">
-        {filteredItems.length === 0 && !data ? (
+        {filteredItems.length === 0 && !data && !isError ? (
           <div className="text-center py-16 text-ink-muted">Loading...</div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center py-24 text-ink-muted">
