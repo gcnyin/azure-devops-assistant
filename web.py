@@ -562,7 +562,9 @@ def api_export():
         writer.writerow(row)
 
     csv_content = output.getvalue()
-    filename = f"sprint_items_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    sprint_label = (data.get("iteration", {}).get("name") or "sprint").strip()
+    safe_name = sprint_label.replace("/", "_").replace("\\", "_").replace(" ", "_")
+    filename = f"{safe_name}_items_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return Response(
         csv_content,
         mimetype="text/csv",
