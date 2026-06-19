@@ -18,7 +18,7 @@ from db import (
     STATUS_CANCELLED, STATUS_COMPLETED, STATUS_FAILED,
     STATUS_PENDING, STATUS_RUNNING,
 )
-from notifier import notify_pr_created, notify_fix_result
+from notifier import notify_fix_result
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -518,10 +518,7 @@ def _push_and_create_pr(
         if pr_url:
             pr_results.append({**repo_result, "branch": branch_name,
                                "pr_url": pr_url, "repo_name": repo_name})
-            try:
-                notify_pr_created(bug, repo_name, pr_url, bug_id, Config())
-            except Exception:
-                logger.exception("PR 通知发送失败")
+
         else:
             pr_results.append({**repo_result, "branch": branch_name,
                                "pr_url": None, "pr_error": "PR URL 为空（意外情况）"})
