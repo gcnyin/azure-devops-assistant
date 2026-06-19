@@ -199,6 +199,11 @@ export function WorkItemsTable({
       }},
     { id: "assignedTo", header: "Owner", size: 96, accessorFn: (r) => r.assignedTo || "Unassigned",
       cell: ({ getValue }) => <span className="text-ink-body font-medium">{String(getValue())}</span> },
+    { id: "createdDate", header: "Created", size: 88, accessorFn: (r) => r.createdDate || "",
+      cell: ({ getValue }) => {
+        const v = String(getValue());
+        return <span className="text-ink-soft tabular-nums">{v ? v.slice(0, 10) : "-"}</span>;
+      }},
   );
 
   if (showDiffColumn) {
