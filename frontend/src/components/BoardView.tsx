@@ -12,7 +12,7 @@ import { StatsRow } from "@/components/StatsRow";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
 import { useBrowserNotification } from "@/hooks/useBrowserNotification";
-import type { BoardData, WorkItem, DiffFilterType } from "@/types/api";
+import type { BoardData, WorkItem, DiffInfo, DiffFilterType } from "@/types/api";
 
 interface BoardViewProps {
   data?: BoardData;
@@ -103,8 +103,19 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const handleRefresh = () => {
     refreshMutation.mutate(undefined, {
       onSuccess: (result) => {
-        if (result.ok) toast.success(result.message || "Data refreshed");
-        else toast.error(result.error || "Refresh failed");
+        if (result.ok) {
+          const di = result.diff_info as DiffInfo | null | undefined;
+          const nn2 = di?.new_items?.length || 0;
+          const nc2 = di?.continuing_items?.filter((it) => it._state_changed).length || 0;
+          const ng2 = di?.gone_items?.length || 0;
+          const parts: string[] = [];
+          if (nn2 > 0) parts.push(`+${nn2} new`);
+          if (nc2 > 0) parts.push(`~${nc2} changed`);
+          if (ng2 > 0) parts.push(`-${ng2} gone`);
+          toast.success(parts.length ? `Data refreshed: ${parts.join(", ")}` : result.message || "Data refreshed");
+        } else {
+          toast.error(result.error || "Refresh failed");
+        }
       },
       onError: () => toast.error("Refresh request failed"),
     });

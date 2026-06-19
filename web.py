@@ -225,7 +225,9 @@ def api_refresh():
         return jsonify({"ok": False, "error": "Refresh not available (callback not registered)"}), 503
     try:
         _refresh_callback()
-        return jsonify({"ok": True, "message": "Data refreshed"})
+        cached = get_cached_data()
+        diff_info = cached.get("diff_info")
+        return jsonify({"ok": True, "message": "Data refreshed", "diff_info": diff_info})
     except Exception as e:
         logger.error("Manual refresh failed: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
