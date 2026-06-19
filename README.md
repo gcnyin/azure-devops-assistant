@@ -18,7 +18,7 @@
 
 ## 技术栈
 
-- **后端**: Python 3.10+ / Flask
+- **后端**: Python 3.10+ / Flask / uv (包管理器)
 - **前端**: React 19 / TypeScript / Vite / shadcn/ui / TanStack Query / TanStack Table
 - **样式**: Tailwind CSS v4 + Raycast 暗色设计系统
 - **数据库**: SQLite
@@ -48,6 +48,14 @@ static/            Vite 构建产物（自动生成）
 ## 快速开始
 
 ### 1. 安装 Python 依赖
+
+**推荐使用 uv (快速、可复现):**
+
+```bash
+uv sync
+```
+
+**或使用 pip (传统方式):**
 
 ```bash
 pip install -r requirements.txt

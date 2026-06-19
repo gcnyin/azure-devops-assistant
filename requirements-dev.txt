@@ -1,4 +1,0 @@
-# 开发与测试依赖
--r requirements.txt
-pytest>=9.0.0
-pytest-mock>=3.15.0

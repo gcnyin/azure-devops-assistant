@@ -6,6 +6,9 @@ LABEL org.opencontainers.image.title="Azure DevOps Sprint Monitor"
 LABEL org.opencontainers.image.description="定时监控 Azure DevOps Sprint 看板，Web UI + 增量对比 + AI 修复建议"
 LABEL org.opencontainers.image.source="https://github.com/steycode/azure-devops-assistant"
 
+# 从 uv 官方镜像复制 uv 二进制（多阶段构建，不增加最终镜像层的体积）
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # 设置工作目录
 WORKDIR /app
 
@@ -17,9 +20,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 先复制依赖文件，利用 Docker 层缓存加速构建
-COPY requirements.txt .
+COPY pyproject.toml uv.lock ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# 使用 uv 安装依赖（--frozen 确保精确复现 lockfile）
+# --no-dev 仅安装生产依赖，减小镜像体积
+RUN uv sync --frozen --no-dev
 
 # 复制项目源码
 COPY *.py .
@@ -37,7 +42,7 @@ EXPOSE 8080
 
 # 健康检查：通过 /health 端点确认 Web 服务存活
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')" || exit 1
+    CMD .venv/bin/python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')" || exit 1
 
 # 使用非 root 用户运行（安全最佳实践）
 RUN useradd --create-home --shell /bin/bash sprintmon \

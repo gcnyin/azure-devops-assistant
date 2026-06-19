@@ -45,7 +45,7 @@ if [ -n "$EXTRA_ARGS" ]; then
     CMD_ARGS="$CMD_ARGS $EXTRA_ARGS"
 fi
 
-echo "启动命令: python main.py $CMD_ARGS"
+echo "启动命令: .venv/bin/python main.py $CMD_ARGS"
 echo ""
 
-exec python main.py $CMD_ARGS
+exec .venv/bin/python main.py $CMD_ARGS
