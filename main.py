@@ -341,10 +341,13 @@ def main():
     # 设置 Web 配置（优先从 DB 读取）
     from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback, set_azure_devops_client
     from web import _apply_runtime_config as apply_runtime_config
-    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch
+    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch, recover_pending_tasks
 
     # 应用 DB 配置到运行时
     apply_runtime_config(db_config)
+
+    # 恢复上次重启前遗留的修复任务
+    recover_pending_tasks()
 
     # 以下 setter 在 _apply_runtime_config 中已调用，此处作为兜底
     set_refresh_callback(check_and_cache)

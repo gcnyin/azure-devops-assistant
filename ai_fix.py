@@ -719,6 +719,38 @@ def enqueue_fix_tasks(bugs: list[dict], sprint_name: str = "") -> list[int]:
     return task_ids
 
 
+def recover_pending_tasks():
+    """服务器重启后恢复 orphaned 修复任务。
+
+    - pending 任务重新入队
+    - running 任务标记为 failed（server restarted during execution）
+    """
+    pending_tasks = get_fix_tasks(status=[STATUS_PENDING])
+    if pending_tasks:
+        logger.info("恢复 %d 个 pending 修复任务", len(pending_tasks))
+        start_worker()
+        for task in pending_tasks:
+            bug = {
+                "id": task["bug_id"],
+                "title": task["bug_title"],
+                "type": task.get("work_item_type", "Bug"),
+                "description": "",
+                "htmlUrl": "",
+            }
+            _task_queue.put((task["id"], bug, task["prompt"] or ""))
+        logger.info("%d 个 pending 任务已重新入队", len(pending_tasks))
+
+    running_tasks = get_fix_tasks(status=[STATUS_RUNNING])
+    for task in running_tasks:
+        update_fix_task_status(
+            task["id"], STATUS_FAILED,
+            error="server restarted during execution",
+            finished_at="now",
+        )
+        logger.info("任务 #%d (Bug #%d) 标记为 failed: server restarted during execution",
+                    task["id"], task["bug_id"])
+
+
 # ── 自测 ──
 if __name__ == "__main__":
     import shutil as _shutil
