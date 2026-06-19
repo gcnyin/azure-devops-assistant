@@ -238,7 +238,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       <div className="table-wrap">
         {filteredItems.length === 0 && !data && !isError ? (
           <div className="text-center py-16 text-ink-muted">Loading...</div>
-        ) : filteredItems.length === 0 ? (
+        ) : filteredItems.length === 0 && data ? (
           <div className="flex flex-col items-center py-24 text-ink-muted">
             <div className="text-4xl mb-3 opacity-60">-</div>
             <div className="text-base text-ink-strong font-medium mb-2">No results</div>
