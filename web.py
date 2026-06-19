@@ -377,27 +377,36 @@ def _build_board_live(sprint_name: str) -> dict | None:
     )
 
 
-@app.route("/api/data")
-def api_data():
-    sprint_name = request.args.get("sprint", "")
+def _get_sprint_data(sprint_name: str) -> dict | None:
+    """Get board data for a Sprint: current cache, snapshot, or live fetch.
+
+    Returns None if sprint_name doesn't match any data source.
+    """
     current_data = get_cached_data()
     current_sprint = current_data.get("iteration", {}).get("name", "")
 
-    # 如果请求了不同的 Sprint，从快照加载
-    if sprint_name and sprint_name != current_sprint:
-        snapshot_data = _build_board_from_snapshot(sprint_name)
-        if snapshot_data is None:
-            # 数据库中无快照，尝试实时拉取
-            snapshot_data = _build_board_live(sprint_name)
-        if snapshot_data is None:
-            return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
-        data = snapshot_data
-        # 沿用当前活跃 Sprint 的 Header 信息，避免切换 Sprint 时跳动
-        data["assigned_to"] = current_data.get("assigned_to", "")
-        data["project"] = current_data.get("project", "")
-        data["team_name"] = current_data.get("team_name", data.get("team_name", ""))
-    else:
-        data = current_data
+    if not sprint_name or sprint_name == current_sprint:
+        return current_data
+
+    data = _build_board_from_snapshot(sprint_name)
+    if data is None:
+        data = _build_board_live(sprint_name)
+    if data is None:
+        return None
+
+    # 沿用当前活跃 Sprint 的 Header 信息，避免切换 Sprint 时跳动
+    data["assigned_to"] = current_data.get("assigned_to", "")
+    data["project"] = current_data.get("project", "")
+    data["team_name"] = current_data.get("team_name", data.get("team_name", ""))
+    return data
+
+
+@app.route("/api/data")
+def api_data():
+    sprint_name = request.args.get("sprint", "")
+    data = _get_sprint_data(sprint_name)
+    if data is None:
+        return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
 
     view_mode = request.args.get("view", "all")
     items = data["items"]
@@ -531,8 +540,11 @@ def api_export():
     if fmt != "csv":
         return jsonify({"error": f"Unsupported format: {fmt}"}), 400
 
+    sprint_name = request.args.get("sprint", "")
     view_mode = request.args.get("view", "all")
-    data = get_cached_data()
+    data = _get_sprint_data(sprint_name)
+    if data is None:
+        return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
     items = data["items"]
 
     if view_mode == "me":
@@ -692,3 +704,21 @@ def run_web_server(start_port: int = 8080, debug: bool = False, max_attempts: in
     raise RuntimeError(
         f"No available port in range {start_port}-{start_port + max_attempts - 1}"
     )
+
+
+# ── Self-check ──
+if __name__ == "__main__":
+    # Smoke-test _get_sprint_data branching logic
+    update_cached_data(
+        iteration={"id": "1", "name": "Sprint 42", "path": "", "startDate": "", "finishDate": ""},
+        items=[], diff_info=None, team_name="test-team")
+    # Empty sprint name → returns current cached data
+    r = _get_sprint_data("")
+    assert r is not None and r["iteration"]["name"] == "Sprint 42", f"empty sprint: {r}"
+    # Same sprint name as current → returns cached data
+    r = _get_sprint_data("Sprint 42")
+    assert r is not None and r["iteration"]["name"] == "Sprint 42", f"same sprint: {r}"
+    # Nonexistent sprint → returns None (no snapshot, no live client)
+    r = _get_sprint_data("nonexistent-sprint-xyz")
+    assert r is None, f"nonexistent sprint: {r}"
+    print("web.py _get_sprint_data: OK")

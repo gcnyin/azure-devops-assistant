@@ -34,7 +34,9 @@ export function AppLayout() {
   };
 
   const handleExport = () => {
-    const url = `/api/export?format=csv&view=${view}`;
+    const params = new URLSearchParams({ format: "csv", view });
+    if (sprintParam) params.set("sprint", sprintParam);
+    const url = `/api/export?${params.toString()}`;
     const link = document.createElement("a");
     link.href = url;
     link.download = "";
