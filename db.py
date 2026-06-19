@@ -59,6 +59,13 @@ def init_db():
                 finished_at TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         # 启用 WAL 模式：允许并发读取不阻塞写入，避免 Web 线程与后台采集线程之间的锁冲突
         # WAL 是持久化设置，只需在初始化时执行一次
         conn.execute("PRAGMA journal_mode=WAL")
@@ -378,3 +385,180 @@ def load_latest_snapshot_by_sprint(sprint_name: str, team_name: str | None = Non
             "fetched_at": row["fetched_at"],
         }
         return items, meta
+
+
+# ── 应用配置持久化 ──
+
+# 配置项元数据: key -> (默认值, 是否敏感)
+_CONFIG_META: dict[str, tuple[str, bool]] = {
+    "azure_devops_org": ("", False),
+    "azure_devops_project": ("", False),
+    "azure_devops_team": ("", False),
+    "azure_devops_pat": ("", True),
+    "query_states": ("To Do,In Progress,Active,New,Committed", False),
+    "check_interval_minutes": ("30", False),
+    "work_dir": ("", False),
+    "ai_fix_timeout_seconds": ("300", False),
+    "target_branch": ("develop", False),
+    "notify_desktop": ("false", False),
+    "notify_webhook_url": ("", False),
+    "web_access_token": ("", True),
+    "log_dir": ("", False),
+    "ai_provider": ("auto", False),
+    "ai_model": ("", False),
+    "ai_api_base_url": ("", False),
+    "ai_api_key": ("", True),
+}
+
+
+def _mask_sensitive(value: str, sensitive: bool) -> str:
+    """对敏感字段做部分掩码：前4+后4可见，中间替换为 ****"""
+    if not sensitive or not value:
+        return value
+    if len(value) <= 8:
+        return "*" * len(value)
+    return value[:4] + "****" + value[-4:]
+
+
+def init_config_from_env(config_obj) -> bool:
+    """如果 app_config 表为空，从 Config 对象和环境变量种子数据。
+    返回 True 表示执行了种子操作。"""
+    with _connect() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM app_config").fetchone()[0]
+        if count > 0:
+            logger.debug("app_config 表已有 %d 条记录，跳过种子", count)
+            return False
+
+    config_map = {
+        "azure_devops_org": config_obj.ORG,
+        "azure_devops_project": config_obj.PROJECT,
+        "azure_devops_team": config_obj.TEAM,
+        "azure_devops_pat": config_obj.PAT,
+        "query_states": ",".join(config_obj.QUERY_STATES),
+        "check_interval_minutes": str(config_obj.CHECK_INTERVAL_MINUTES),
+        "work_dir": config_obj.WORK_DIR,
+        "ai_fix_timeout_seconds": str(config_obj.AI_FIX_TIMEOUT_SECONDS),
+        "target_branch": config_obj.TARGET_BRANCH,
+        "notify_desktop": "true" if config_obj.NOTIFY_DESKTOP else "false",
+        "notify_webhook_url": config_obj.NOTIFY_WEBHOOK_URL,
+        "web_access_token": config_obj.WEB_ACCESS_TOKEN,
+        "log_dir": config_obj.LOG_DIR,
+    }
+
+    with _connect() as conn:
+        for key, (default_val, _sensitive) in _CONFIG_META.items():
+            value = config_map.get(key)
+            if value is None:
+                value = default_val
+            conn.execute(
+                "INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)",
+                (key, str(value)),
+            )
+        conn.commit()
+    logger.info("已从环境变量种子 %d 条配置到数据库", len(_CONFIG_META))
+    return True
+
+
+def load_all_config(for_api: bool = False) -> dict[str, str]:
+    """加载全部配置。for_api=True 时敏感字段做掩码处理。"""
+    result: dict[str, str] = {}
+    with _connect() as conn:
+        rows = conn.execute("SELECT key, value FROM app_config").fetchall()
+        for r in rows:
+            key = r["key"]
+            value = r["value"]
+            _, sensitive = _CONFIG_META.get(key, ("", False))
+            if for_api and sensitive:
+                value = _mask_sensitive(value, sensitive)
+            result[key] = value
+    # 确保所有已知 key 都有值（回退到默认）
+    for key, (default_val, _sensitive) in _CONFIG_META.items():
+        if key not in result:
+            value = default_val
+            if for_api and _sensitive:
+                value = _mask_sensitive(value, _sensitive)
+            result[key] = value
+    return result
+
+
+def save_config(data: dict[str, str]) -> tuple[dict[str, str], list[str]]:
+    """保存配置到数据库。只保存已知的 key，跳过掩码未修改的敏感字段。
+    返回 (全量配置含掩码, 验证错误列表)。
+    """
+    errors: list[str] = []
+
+    # 验证
+    org = data.get("azure_devops_org", "").strip()
+    project = data.get("azure_devops_project", "").strip()
+    pat = data.get("azure_devops_pat", "").strip()
+    interval_str = data.get("check_interval_minutes", "30").strip()
+    timeout_str = data.get("ai_fix_timeout_seconds", "300").strip()
+    webhook = data.get("notify_webhook_url", "").strip()
+
+    if not org:
+        errors.append("azure_devops_org: 不能为空")
+    if not project:
+        errors.append("azure_devops_project: 不能为空")
+    if not pat or pat == "*" * len(pat):
+        # 掩码值 = 未修改
+        pass
+    elif not pat:
+        errors.append("azure_devops_pat: 不能为空")
+
+    try:
+        interval = int(interval_str)
+        if interval < 1:
+            errors.append("check_interval_minutes: 必须为正整数")
+    except ValueError:
+        errors.append("check_interval_minutes: 必须为整数")
+
+    try:
+        timeout = int(timeout_str)
+        if timeout < 1:
+            errors.append("ai_fix_timeout_seconds: 必须为正整数")
+    except ValueError:
+        errors.append("ai_fix_timeout_seconds: 必须为整数")
+
+    if webhook:
+        if not (webhook.startswith("http://") or webhook.startswith("https://")):
+            errors.append("notify_webhook_url: 必须以 http:// 或 https:// 开头")
+
+    if errors:
+        return load_all_config(for_api=True), errors
+
+    # 写入
+    with _connect() as conn:
+        for key in _CONFIG_META:
+            if key not in data:
+                continue
+            raw_value = str(data[key]).strip()
+            _, sensitive = _CONFIG_META[key]
+            if sensitive:
+                # 检查是否为掩码值（未修改）
+                existing = conn.execute(
+                    "SELECT value FROM app_config WHERE key = ?", (key,)
+                ).fetchone()
+                if existing:
+                    masked_existing = _mask_sensitive(existing["value"], True)
+                    if raw_value == masked_existing or raw_value == "*" * len(raw_value):
+                        continue  # 未修改，跳过
+            conn.execute(
+                "INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+                (key, raw_value),
+            )
+        conn.commit()
+
+    logger.info("配置已保存: %d 项", len(data))
+    return load_all_config(for_api=True), []
+
+
+def get_config_value(key: str, default: str = "") -> str:
+    """读取单个配置值（用于运行时读取，不掩码）"""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT value FROM app_config WHERE key = ?", (key,)
+        ).fetchone()
+        if row:
+            return row["value"]
+    _, _sensitive = _CONFIG_META.get(key, (default, False))
+    return default

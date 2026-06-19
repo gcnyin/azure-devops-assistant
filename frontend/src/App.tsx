@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { BoardRoute } from "@/routes/BoardRoute";
 import FixesRoute from "@/routes/FixesRoute";
+import SettingsRoute from "@/routes/SettingsRoute";
 import { HistoryView } from "@/components/HistoryView";
 import { SnapshotDetail } from "@/components/SnapshotDetail";
 import { DiffView } from "@/components/DiffView";
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="history" element={<HistoryView />} />
           <Route path="history/:id" element={<SnapshotDetail />} />
           <Route path="diff/:idA/:idB" element={<DiffView />} />
+          <Route path="settings" element={<SettingsRoute />} />
         </Route>
       </Routes>
     </BrowserRouter>

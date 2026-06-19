@@ -18,6 +18,7 @@ from db import (
     get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
     list_sprint_summaries, load_latest_snapshot_by_sprint,
     save_snapshot,
+    load_all_config, save_config,
 )
 from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir
 from utils import get_logger
@@ -155,6 +156,40 @@ def _check_access_token():
     if token != _access_token:
         return jsonify({"error": "Invalid access token"}), 401
     return None
+
+
+# ── Runtime config setters ──
+
+def _apply_runtime_config(data: dict[str, str]):
+    """将配置值应用到运行时全局变量和 setter 函数"""
+    global _expected_query_states, _work_dir, _access_token
+    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch, \
+        set_work_dir as ai_set_work_dir
+
+    # 查询状态
+    states_str = data.get("query_states", "")
+    if states_str:
+        _expected_query_states = [s.strip() for s in states_str.split(",") if s.strip()]
+
+    # 工作目录
+    wd = data.get("work_dir", "").strip()
+    _work_dir = wd or "."
+    ai_set_work_dir(_work_dir)
+
+    # AI fix 超时
+    timeout_str = data.get("ai_fix_timeout_seconds", "300")
+    try:
+        ai_set_timeout(int(timeout_str))
+    except ValueError:
+        pass
+
+    # 目标分支
+    tb = data.get("target_branch", "").strip()
+    if tb:
+        ai_set_target_branch(tb)
+
+    # Web 认证
+    _access_token = data.get("web_access_token", "").strip()
 
 
 # ── API Routes ──
@@ -531,6 +566,33 @@ def api_history_diff(id1: int, id2: int):
     except Exception as e:
         logger.error("Snapshot diff %d vs %d failed: %s", id1, id2, e)
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/settings")
+def api_settings():
+    """GET: 返回全量配置（敏感字段掩码）"""
+    try:
+        config = load_all_config(for_api=True)
+        return jsonify(config)
+    except Exception as e:
+        logger.error("读取配置失败: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/settings", methods=["PUT"])
+def api_settings_save():
+    """PUT: 保存全量配置"""
+    body = request.get_json(silent=True) or {}
+    try:
+        config, errors = save_config(body)
+        if errors:
+            return jsonify({"ok": False, "errors": errors, "config": config}), 400
+        # 应用运行时变更
+        _apply_runtime_config(config)
+        return jsonify({"ok": True, "config": config})
+    except Exception as e:
+        logger.error("保存配置失败: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/history/<int:snapshot_id>")

@@ -119,3 +119,30 @@ export interface SprintsResponse {
 }
 
 export type DiffFilterType = "new" | "changed" | "gone";
+
+export interface SettingsData {
+  azure_devops_org: string;
+  azure_devops_project: string;
+  azure_devops_team: string;
+  azure_devops_pat: string;
+  query_states: string;
+  check_interval_minutes: string;
+  work_dir: string;
+  ai_fix_timeout_seconds: string;
+  target_branch: string;
+  notify_desktop: string;
+  notify_webhook_url: string;
+  web_access_token: string;
+  log_dir: string;
+  ai_provider: string;
+  ai_model: string;
+  ai_api_base_url: string;
+  ai_api_key: string;
+}
+
+export interface SaveSettingsResult {
+  ok: boolean;
+  config?: SettingsData;
+  errors?: string[];
+  error?: string;
+}

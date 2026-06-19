@@ -19,6 +19,7 @@ export function AppLayout() {
   let activeTab = "board";
   if (pathname.startsWith("/fixes")) activeTab = "fixes";
   else if (pathname.startsWith("/history")) activeTab = "history";
+  else if (pathname.startsWith("/settings")) activeTab = "settings";
 
   const handleSprintChange = (sprint: string) => {
     setSearchParams((prev) => {
@@ -56,6 +57,7 @@ export function AppLayout() {
         value={activeTab}
         onValueChange={(v) => {
           if (v === "board") navigate("/");
+          else if (v === "settings") navigate("/settings");
           else navigate(`/${v}`);
         }}
         className="mb-6"
@@ -64,6 +66,7 @@ export function AppLayout() {
           <TabsTrigger value="board">Board</TabsTrigger>
           <TabsTrigger value="fixes">AI Fixes</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
       </Tabs>
 

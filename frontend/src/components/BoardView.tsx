@@ -4,12 +4,14 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { WorkItemsTable } from "@/components/WorkItemsTable";
 import { DetailModal } from "@/components/DetailModal";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatsRow } from "@/components/StatsRow";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
+import { useBrowserNotification } from "@/hooks/useBrowserNotification";
 import type { BoardData, WorkItem, DiffFilterType } from "@/types/api";
 
 interface BoardViewProps {
@@ -34,6 +36,8 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
   const refreshMutation = useRefreshMutation();
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [searchText, setSearchText] = useState(searchQuery);
+
+  const { permission, enabled, requestPermission, toggleEnabled } = useBrowserNotification(data);
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
@@ -114,6 +118,45 @@ export function BoardView({ data, incompleteStates, stateColors }: BoardViewProp
           onClick={() => setView("all")}>All</Button>
         <Button variant={view === "me" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
           onClick={() => setView("me")}>Me</Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-lg px-2"
+                onClick={() => {
+                  if (permission !== "granted") {
+                    requestPermission();
+                  } else {
+                    toggleEnabled();
+                  }
+                }}
+              >
+                {permission === "unsupported" ? (
+                  <span className="text-ink-soft text-sm">-</span>
+                ) : permission === "denied" ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+                ) : permission === "granted" && enabled ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent-amber"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {permission === "unsupported"
+                ? "此浏览器不支持通知"
+                : permission === "denied"
+                  ? "通知权限已被拒绝"
+                  : permission !== "granted"
+                    ? "点击开启浏览器通知"
+                    : enabled
+                      ? "通知已开启 — 点击关闭"
+                      : "通知已暂停 — 点击开启"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <div className="flex-1" />
         <Button
           variant="ghost"

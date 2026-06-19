@@ -17,7 +17,8 @@ import schedule
 
 from config import Config
 from azure_devops import AzureDevOpsClient
-from db import init_db, load_previous_items, save_snapshot, diff_items, load_snapshot_by_id, list_snapshots
+from db import init_db, load_previous_items, save_snapshot, diff_items, load_snapshot_by_id, list_snapshots, \
+    init_config_from_env, load_all_config
 from notifier import notify_changes
 from web import update_cached_data, run_web_server
 from utils import setup_logging, get_logger
@@ -260,8 +261,13 @@ def main():
     logger.info("启动 Sprint Monitor: ORG=%s, PROJECT=%s", config.ORG, config.PROJECT)
 
     client = AzureDevOpsClient()
-    interval = args.interval or config.CHECK_INTERVAL_MINUTES
     init_db()
+
+    # 初始化配置持久化: 首次启动从 .env 种子到 DB，之后从 DB 读取
+    init_config_from_env(config)
+    db_config = load_all_config(for_api=False)
+
+    interval = args.interval or int(db_config.get("check_interval_minutes", str(config.CHECK_INTERVAL_MINUTES)))
 
     assigned_to = client.get_my_display_name()
     if not assigned_to:
@@ -332,16 +338,17 @@ def main():
 
     # ── Web UI ──
 
-    # 设置 Web 配置
+    # 设置 Web 配置（优先从 DB 读取）
     from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback, set_azure_devops_client
+    from web import _apply_runtime_config as apply_runtime_config
     from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch
-    set_web_query_states(config.QUERY_STATES)
-    set_web_work_dir(config.WORK_DIR)
-    set_web_access_token(config.WEB_ACCESS_TOKEN)
+
+    # 应用 DB 配置到运行时
+    apply_runtime_config(db_config)
+
+    # 以下 setter 在 _apply_runtime_config 中已调用，此处作为兜底
     set_refresh_callback(check_and_cache)
     set_azure_devops_client(client)
-    ai_set_timeout(config.AI_FIX_TIMEOUT_SECONDS)
-    ai_set_target_branch(config.TARGET_BRANCH)
 
     # 确定监听地址
     host = "0.0.0.0" if args.public else "127.0.0.1"

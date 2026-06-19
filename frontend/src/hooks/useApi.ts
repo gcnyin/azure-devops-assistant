@@ -7,6 +7,8 @@ import type {
   DiffSnapshotData,
   AppConfig,
   SprintsResponse,
+  SettingsData,
+  SaveSettingsResult,
 } from "@/types/api";
 
 const API_BASE = "";
@@ -129,5 +131,30 @@ export function useSnapshotDiff(idA: number, idB: number) {
     queryKey: ["diff", idA, idB],
     queryFn: () => fetchJson(`/api/history/diff/${idA}/${idB}`),
     enabled: !!idA && !!idB && !isNaN(idA) && !isNaN(idB),
+  });
+}
+
+export function useSettings() {
+  return useQuery<SettingsData>({
+    queryKey: ["settings"],
+    queryFn: () => fetchJson("/api/settings"),
+    staleTime: 10_000,
+  });
+}
+
+export function useSaveSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: SettingsData) =>
+      fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).then((r) => r.json()) as Promise<SaveSettingsResult>,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries({ queryKey: ["config"] });
+    },
   });
 }
