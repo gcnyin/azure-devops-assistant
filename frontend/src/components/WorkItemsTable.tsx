@@ -20,6 +20,8 @@ interface WorkItemsTableProps {
   showFixColumn?: boolean;
   onTriggerFix?: (bugId: number) => void;
   onViewFix?: (bugId: number) => void;
+  checkedBugIds?: Set<number>;
+  onToggleBugCheck?: (bugId: number) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -165,6 +167,7 @@ function FixCell({ item, onTriggerFix, onViewFix }: {
 export function WorkItemsTable({
   items, rowType, onRowClick, showDiffColumn, diffType, stateColors,
   showFixColumn, onTriggerFix, onViewFix,
+  checkedBugIds, onToggleBugCheck,
 }: WorkItemsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -218,6 +221,25 @@ export function WorkItemsTable({
   }
 
   if (showFixColumn) {
+    columns.unshift({
+      id: "select", header: "", size: 40, enableSorting: false,
+      cell: ({ row: tr }) => {
+        const it = tr.original;
+        const isBug = (it.type || "").toLowerCase() === "bug";
+        if (!isBug) return null;
+        return (
+          <input
+            type="checkbox"
+            className="cursor-pointer w-4 h-4"
+            checked={checkedBugIds?.has(it.id) ?? false}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleBugCheck?.(it.id);
+            }}
+          />
+        );
+      },
+    });
     columns.push({
       id: "fix", header: "AI Fix", size: 100, minSize: 110, enableSorting: false,
       cell: ({ row: tr }) => (

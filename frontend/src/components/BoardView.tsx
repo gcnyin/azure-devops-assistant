@@ -38,6 +38,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const refreshMutation = useRefreshMutation();
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [searchText, setSearchText] = useState(searchQuery);
+  const [checkedBugIds, setCheckedBugIds] = useState<Set<number>>(new Set());
 
   const { permission, enabled, requestPermission, toggleEnabled } = useBrowserNotification(data);
 
@@ -86,6 +87,30 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       onError: () => toast.error("Failed to queue fix task"),
     });
   };
+
+  const handleBulkFix = () => {
+    const ids = Array.from(checkedBugIds);
+    if (ids.length === 0) return;
+    fixesMutation.mutate(ids, {
+      onSuccess: (result) => {
+        if (result.ok) {
+          toast.success(result.message || `Queued fix for ${ids.length} bugs`);
+          setCheckedBugIds(new Set());
+        } else {
+          toast.error(result.error || "Failed to queue fix tasks");
+        }
+      },
+      onError: () => toast.error("Failed to queue fix tasks"),
+    });
+  };
+
+  const toggleBugCheck = useCallback((bugId: number) => {
+    setCheckedBugIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bugId)) next.delete(bugId); else next.add(bugId);
+      return next;
+    });
+  }, []);
 
   const handleViewFix = (bugId: number) => {
     navigate(`/fixes?bug_id=${bugId}`);
@@ -172,6 +197,17 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
           </Tooltip>
         </TooltipProvider>
         <div className="flex-1" />
+        {checkedBugIds.size > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="rounded-lg"
+            disabled={fixesMutation.isPending}
+            onClick={handleBulkFix}
+          >
+            {fixesMutation.isPending ? "Fixing..." : `Fix selected (${checkedBugIds.size})`}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -256,6 +292,8 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
             showFixColumn
             onTriggerFix={handleTriggerFix}
             onViewFix={handleViewFix}
+            checkedBugIds={checkedBugIds}
+            onToggleBugCheck={toggleBugCheck}
           />
         )}
       </div>
