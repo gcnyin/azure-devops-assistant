@@ -18,7 +18,7 @@ from db import (
     STATUS_CANCELLED, STATUS_COMPLETED, STATUS_FAILED,
     STATUS_PENDING, STATUS_RUNNING,
 )
-from notifier import notify_pr_created
+from notifier import notify_pr_created, notify_fix_result
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -269,6 +269,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             error=f"WORK_DIR 下未找到任何 Git 仓库: {_work_dir}",
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=False,
+                          error=f"WORK_DIR 下未找到任何 Git 仓库: {_work_dir}")
         return
 
     # ── 步骤 2: 准备所有仓库用于分析 (stash → checkout develop → pull) ──
@@ -300,6 +302,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
                 error=f"准备仓库 [{repo_name}] 失败: {e}",
                 finished_at="now",
             )
+            notify_fix_result(bug, bug_id, success=False,
+                              error=f"准备仓库 [{repo_name}] 失败: {e}")
             prep_failed = True
             break
 
@@ -318,6 +322,9 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             error=analysis_error or "分析阶段无可用的 AI agent",
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=False,
+                          error=analysis_error or "分析阶段无可用的 AI agent",
+                          agent_name=analysis_agent or "")
         logger.warning("任务 #%d 分析阶段失败: %s", task_id, analysis_error)
         return
 
@@ -331,6 +338,9 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             response=analysis_response,
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=False,
+                          error="AI 分析未能定位到目标仓库",
+                          agent_name=analysis_agent or "")
         logger.warning("任务 #%d 分析结果为空", task_id)
         return
 
@@ -364,6 +374,9 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             response=analysis_response,
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=False,
+                          error="目标仓库验证失败，无法创建 fix 分支",
+                          agent_name=analysis_agent or "")
         return
 
     # ── 步骤 5: 阶段 2 — AI 修复代码 ──
@@ -433,6 +446,9 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             repo_results=repo_results_json,
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=True,
+                          agent_name=final_agent or "",
+                          pr_results=pr_results if pr_results else None)
         logger.info("任务 #%d 完成: agent=%s, 响应 %d 字符, PR %d 个",
                     task_id, final_agent, len(combined_response),
                     sum(1 for r in pr_results if r.get("pr_url")))
@@ -445,6 +461,10 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             repo_results=repo_results_json,
             finished_at="now",
         )
+        notify_fix_result(bug, bug_id, success=False,
+                          error=agent_error or "修复阶段无可用的 AI agent",
+                          agent_name=final_agent or "",
+                          pr_results=pr_results if pr_results else None)
         logger.warning("任务 #%d 修复阶段失败: %s", task_id, agent_error)
 
 

@@ -627,3 +627,196 @@ class TestNotifyChanges:
         assert "无链接项" in text
         # 没有 htmlUrl 时不应生成 <url|...> 中的 url 部分
         assert "<http" not in text
+
+
+# ── notify_fix_result 测试 ──
+
+
+class TestNotifyFixResult:
+    """AI 修复结果通知测试"""
+
+    def test_success_with_pr(self, mocker):
+        """修复成功且有 PR 时发送完成通知"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="https://hooks.example.com/webhook")
+        pr_results = [
+            {"repo_name": "my-repo", "pr_url": "https://dev.azure.com/org/_git/my-repo/pullrequest/1"},
+            {"repo_name": "auth-svc", "pr_url": "https://dev.azure.com/org/_git/auth-svc/pullrequest/2"},
+        ]
+        notify_fix_result(
+            {"title": "修复登录Bug", "id": 42}, 42,
+            success=True, agent_name="pi", pr_results=pr_results, config=cfg,
+        )
+
+        # 桌面通知
+        mock_desktop.assert_called_once()
+        title, body = mock_desktop.call_args[0]
+        assert "Completed" in title
+        assert "AB#42" in title
+        assert "修复登录Bug" in body
+        assert "my-repo" in body
+        assert "auth-svc" in body
+
+        # Webhook
+        mock_webhook.assert_called_once()
+        payload = mock_webhook.call_args[0][1]
+        att = payload["attachments"][0]
+        assert att["color"] == "#22c55e"
+        assert len(att["fields"]) == 2
+        assert att["fields"][0]["title"] == "my-repo"
+        assert att["fields"][1]["title"] == "auth-svc"
+
+    def test_success_push_no_pr(self, mocker):
+        """修复成功但仅 push 未创建 PR 时仍发送通知"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="https://hooks.example.com/webhook")
+        pr_results = [
+            {"repo_name": "legacy", "pr_url": None, "pr_note": "修复阶段未完全成功，仅 push 分支未创建 PR"},
+        ]
+        notify_fix_result(
+            {"title": "部分修复"}, 7,
+            success=True, agent_name="claude", pr_results=pr_results, config=cfg,
+        )
+
+        body = mock_desktop.call_args[0][1]
+        assert "legacy" in body
+        assert "仅 push 分支未创建 PR" in body
+
+    def test_failure_with_error(self, mocker):
+        """修复失败时发送错误通知"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="https://hooks.example.com/webhook")
+        notify_fix_result(
+            {"title": "崩溃Bug", "id": 99}, 99,
+            success=False, error="分析阶段无可用的 AI agent", agent_name="claude", config=cfg,
+        )
+
+        # 桌面通知
+        title, body = mock_desktop.call_args[0]
+        assert "Failed" in title
+        assert "AB#99" in title
+        assert "崩溃Bug" in body
+        assert "分析阶段无可用的 AI agent" in body
+
+        # Webhook
+        payload = mock_webhook.call_args[0][1]
+        att = payload["attachments"][0]
+        assert att["color"] == "#ef4444"
+        assert att["fields"][0]["value"] == "分析阶段无可用的 AI agent"
+
+    def test_failure_with_push_error(self, mocker):
+        """修复失败但已有 push 结果时，通知同时展示错误和 push 信息"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True)
+        pr_results = [
+            {"repo_name": "core", "pr_url": None, "push_error": "remote rejected"},
+        ]
+        notify_fix_result(
+            {"title": "连接超时"}, 3,
+            success=False, error="修复阶段无可用的 AI agent",
+            agent_name="pi", pr_results=pr_results, config=cfg,
+        )
+
+        body = mock_desktop.call_args[0][1]
+        assert "修复阶段无可用的 AI agent" in body
+        assert "core" in body
+        assert "remote rejected" in body
+
+    def test_desktop_only(self, mocker):
+        """仅桌面通知启用时只发送桌面"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="")
+        notify_fix_result(
+            {"title": "桌面测试"}, 1,
+            success=True, config=cfg,
+        )
+
+        mock_desktop.assert_called_once()
+        mock_webhook.assert_not_called()
+
+    def test_neither_enabled(self, mocker):
+        """桌面和 Webhook 都未启用时不发送"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=False, NOTIFY_WEBHOOK_URL="")
+        notify_fix_result(
+            {"title": "静默"}, 0,
+            success=False, error="无通知", config=cfg,
+        )
+
+        mock_desktop.assert_not_called()
+        mock_webhook.assert_not_called()
+
+    def test_default_config_when_none(self, mocker):
+        """未传 config 时使用默认 Config 不崩溃"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+
+        from notifier import notify_fix_result
+
+        notify_fix_result(
+            {"title": "默认配置"}, 5,
+            success=True,
+        )
+
+        mock_desktop.assert_not_called()  # 环境变量未设置 NOTIFY_DESKTOP
+
+    def test_pr_webhook_url_takes_precedence(self, mocker):
+        """NOTIFY_PR_WEBHOOK_URL 优先于 NOTIFY_WEBHOOK_URL"""
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(
+            NOTIFY_WEBHOOK_URL="https://hooks.example.com/general",
+            NOTIFY_PR_WEBHOOK_URL="https://hooks.example.com/pr-special",
+        )
+        notify_fix_result(
+            {"title": "Webhook 优先级"}, 8,
+            success=True, pr_results=[{"repo_name": "r", "pr_url": "http://pr"}],
+            config=cfg,
+        )
+
+        called_url = mock_webhook.call_args[0][0]
+        assert called_url == "https://hooks.example.com/pr-special"
+
+    def test_fix_result_truncates_long_error(self, mocker):
+        """超长错误信息在通知中截断"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+
+        from notifier import notify_fix_result
+
+        cfg = _make_config(NOTIFY_DESKTOP=True)
+        long_error = "x" * 300
+        notify_fix_result(
+            {"title": "长错误"}, 6,
+            success=False, error=long_error, config=cfg,
+        )
+
+        body = mock_desktop.call_args[0][1]
+        assert "Error:" in body
+        assert len(long_error) > 200
+        # 截断后 body 中 "x" 不超过 200
+        error_part = body.split("Error: ")[1]
+        assert len(error_part) <= 200

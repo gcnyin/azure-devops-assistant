@@ -158,6 +158,83 @@ def notify_changes(
         _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
 
 
+def notify_fix_result(bug: dict, bug_id: int, success: bool, error: str = "",
+                      agent_name: str = "", pr_results: list | None = None,
+                      config: Config | None = None):
+    """AI 修复完成或失败时发送桌面通知和 Webhook 通知
+
+    success=False 时显示错误信息；success=True 时显示 PR 结果摘要（若 pr_results 为空则仅提示已完成）。
+    复用 _send_desktop 和 _send_webhook，无外部依赖。
+    """
+    if config is None:
+        config = Config()
+
+    bug_title = bug.get("title", "N/A")
+
+    if success:
+        title = f"[AI Fix] Completed - AB#{bug_id}"
+        lines = [bug_title[:80]]
+        if pr_results:
+            for r in pr_results:
+                repo = r.get("repo_name") or r.get("path", "?")
+                pr_url_val = r.get("pr_url")
+                if pr_url_val:
+                    lines.append(f"{repo}: {pr_url_val}")
+                else:
+                    detail = (r.get("push_error") or r.get("pr_error")
+                              or r.get("pr_note") or "pushed (no PR)")
+                    lines.append(f"{repo}: {detail}")
+        body = "\n".join(lines)
+    else:
+        title = f"[AI Fix] Failed - AB#{bug_id}"
+        lines = [bug_title[:80]]
+        if pr_results:
+            for r in pr_results:
+                repo = r.get("repo_name") or r.get("path", "?")
+                pr_url_val = r.get("pr_url")
+                if pr_url_val:
+                    lines.append(f"{repo}: {pr_url_val}")
+                else:
+                    detail = (r.get("push_error") or r.get("pr_error")
+                              or r.get("pr_note") or "pushed")
+                    lines.append(f"{repo}: {detail}")
+        if error:
+            lines.append(f"Error: {error[:200]}")
+        if agent_name:
+            lines.append(f"Agent: {agent_name}")
+        body = "\n".join(lines)
+
+    if config.NOTIFY_DESKTOP:
+        _send_desktop(title, body)
+
+    webhook_url = config.NOTIFY_PR_WEBHOOK_URL or config.NOTIFY_WEBHOOK_URL
+    if webhook_url:
+        color = "#22c55e" if success else "#ef4444"
+        fields = []
+        if pr_results:
+            for r in pr_results:
+                repo = r.get("repo_name") or r.get("path", "?")
+                val = r.get("pr_url", "")
+                if not val:
+                    val = (r.get("push_error") or r.get("pr_error")
+                           or r.get("pr_note") or "pushed (no PR)")
+                fields.append({"title": repo, "value": str(val), "short": False})
+        if error:
+            fields.append({"title": "Error", "value": error[:200], "short": False})
+
+        payload = {
+            "attachments": [{
+                "color": color,
+                "title": title,
+                "text": body,
+                "fields": fields,
+                "footer": f"Agent: {agent_name}" if agent_name else "Azure DevOps AI Fix",
+                "ts": int(datetime.now().timestamp()),
+            }]
+        }
+        _send_webhook(webhook_url, payload)
+
+
 def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int, config: Config | None = None):
     """PR 创建成功时发送桌面通知和 Webhook 通知（包含 PR 链接）"""
     title = f"[AI Fix] PR Created - AB#{bug_id}"
