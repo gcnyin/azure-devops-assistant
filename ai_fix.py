@@ -30,6 +30,10 @@ _work_dir: str = "."
 _timeout_seconds: int = 300
 _target_branch: str = "develop"
 _agent_name: str = ""
+_ai_provider: str = "auto"
+_ai_model: str = ""
+_ai_api_base_url: str = ""
+_ai_api_key: str = ""
 
 
 def set_work_dir(work_dir: str):
@@ -45,6 +49,26 @@ def set_timeout(seconds: int):
 def set_target_branch(branch: str):
     global _target_branch
     _target_branch = branch
+
+
+def set_ai_provider(provider: str):
+    global _ai_provider
+    _ai_provider = provider.strip().lower() if provider else "auto"
+
+
+def set_ai_model(model: str):
+    global _ai_model
+    _ai_model = model.strip() if model else ""
+
+
+def set_ai_api_base_url(url: str):
+    global _ai_api_base_url
+    _ai_api_base_url = url.strip() if url else ""
+
+
+def set_ai_api_key(key: str):
+    global _ai_api_key
+    _ai_api_key = key.strip() if key else ""
 
 
 def start_worker():
@@ -512,13 +536,34 @@ def _build_pr_description(bug: dict, agent: str | None, fix_result: dict,
 
 
 def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
-    """尝试调用可用的 AI agent，返回 (response, agent_name, error)"""
-    candidates = [
+    """尝试调用可用的 AI agent，返回 (response, agent_name, error)
+
+    根据 _ai_provider 过滤候选列表：
+    - "auto" 或空：按优先级尝试全部已知 agent
+    - 指定名称（如 "claude"）：仅尝试该 agent
+    """
+    all_candidates = [
         ("pi", lambda p: ["pi", "-p", "--approve", p]),
         ("claude", lambda p: ["claude", "-p", p, "--add-dir", _work_dir]),
         ("opencode", lambda p: ["opencode", "run", p]),
         ("codex", lambda p: ["codex", "exec", p]),
     ]
+
+    provider = _ai_provider if _ai_provider else "auto"
+    if provider == "auto":
+        candidates = list(all_candidates)
+    else:
+        candidates = [(n, b) for n, b in all_candidates if n == provider]
+        if not candidates:
+            logger.warning("配置的 AI provider [%s] 不在已知候选列表中", provider)
+            return None, provider, f"未知的 AI provider: {provider}"
+
+    # 构建子进程环境变量
+    env = os.environ.copy()
+    if _ai_api_base_url:
+        env.setdefault("OPENAI_BASE_URL", _ai_api_base_url)
+    if _ai_api_key:
+        env.setdefault("OPENAI_API_KEY", _ai_api_key)
 
     errors: list[str] = []
     last_agent: str | None = None
@@ -526,16 +571,24 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
     for name, build_args in candidates:
         exe = shutil.which(name)
         if not exe:
+            # 仅对指定 provider 报错；auto 模式下跳过未安装的 agent
+            if provider != "auto":
+                errors.append(f"agent [{name}] 未安装或不在 PATH 中")
             continue
         last_agent = name
         logger.info("调用 AI agent [%s] 生成修复...", name)
         try:
+            args = list(build_args(prompt))
+            if _ai_model:
+                args.append("--model")
+                args.append(_ai_model)
             result = subprocess.run(
-                build_args(prompt),
+                args,
                 capture_output=True,
                 text=True,
                 timeout=_timeout_seconds,
                 cwd=_work_dir,
+                env=env,
             )
             output = (result.stdout + result.stderr).strip()
             if output:

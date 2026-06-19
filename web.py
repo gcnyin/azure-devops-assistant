@@ -163,8 +163,15 @@ def _check_access_token():
 def _apply_runtime_config(data: dict[str, str]):
     """将配置值应用到运行时全局变量和 setter 函数"""
     global _expected_query_states, _work_dir, _access_token
-    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch, \
-        set_work_dir as ai_set_work_dir
+    from ai_fix import (
+        set_timeout as ai_set_timeout,
+        set_target_branch as ai_set_target_branch,
+        set_work_dir as ai_set_work_dir,
+        set_ai_provider,
+        set_ai_model,
+        set_ai_api_base_url,
+        set_ai_api_key,
+    )
 
     # 查询状态
     states_str = data.get("query_states", "")
@@ -187,6 +194,12 @@ def _apply_runtime_config(data: dict[str, str]):
     tb = data.get("target_branch", "").strip()
     if tb:
         ai_set_target_branch(tb)
+
+    # AI Provider / Model
+    set_ai_provider(data.get("ai_provider", "auto"))
+    set_ai_model(data.get("ai_model", ""))
+    set_ai_api_base_url(data.get("ai_api_base_url", ""))
+    set_ai_api_key(data.get("ai_api_key", ""))
 
     # Web 认证
     _access_token = data.get("web_access_token", "").strip()
