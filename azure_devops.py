@@ -384,24 +384,28 @@ class AzureDevOpsClient:
         if resp.status_code == 409:
             # PR 已存在，尝试查找已有 PR
             logger.info("PR 已存在 (409)，查找已有 PR: %s -> %s", source_branch, target_branch)
-            existing = self._find_existing_pr(repo_name, source_branch)
-            if existing:
-                logger.info("找到已有 PR: %s", existing)
-                return existing
+        else:
+            resp.raise_for_status()
+            pr_data = resp.json()
+            pr_id = pr_data.get("pullRequestId")
+            logger.info("PR 创建成功: pullRequestId=%s, source=%s, target=%s",
+                        pr_id, source_branch, target_branch)
+
+        # 统一用同名 source branch 搜索确认 PR 确实存在且可访问
+        existing = self._find_existing_pr(repo_name, source_branch)
+        if existing:
+            logger.info("确认 PR 存在（同名 source branch）: %s", existing)
+            return existing
+
+        if resp.status_code == 409:
             raise RuntimeError(
                 f"PR 已存在 (409) 但未找到匹配的 PR 记录，"
                 f"source={source_branch}, target={target_branch}"
             )
-
-        resp.raise_for_status()
-        pr_data = resp.json()
-        pr_id = pr_data.get("pullRequestId")
-        pr_url = self._extract_pr_url(pr_data, repo_name, pr_id)
-        if not pr_url:
-            logger.warning("PR 创建成功但无法提取 URL（_links 和 pullRequestId 均缺失），响应: %s", pr_data)
-        else:
-            logger.info("PR 创建成功: %s", pr_url)
-        return pr_url
+        raise RuntimeError(
+            f"PR 创建后未能在 API 中通过同名 source branch 确认，"
+            f"source={source_branch}, target={target_branch}"
+        )
 
     def _find_existing_pr(self, repo_name: str, source_branch: str) -> str:
         """查找已有 PR，先搜 active，再搜全部状态，返回 URL 或空字符串"""
