@@ -163,6 +163,7 @@ STATUS_FAILED = "failed"
 STATUS_CANCELLED = "cancelled"
 ALL_STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED]
 CANCELLABLE_STATUSES = [STATUS_PENDING, STATUS_RUNNING]
+RETRYABLE_STATUSES = [STATUS_FAILED, STATUS_CANCELLED]
 
 
 def create_fix_task(bug_id: int, bug_title: str, sprint_name: str = "",
@@ -229,6 +230,20 @@ def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = No
             return [dict(r) for r in rows]
     except Exception:
         return []
+
+
+def get_fix_task_by_id(task_id: int) -> dict | None:
+    """按 ID 获取单个修复任务，不存在返回 None"""
+    try:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM fix_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if not row:
+                return None
+            return dict(row)
+    except Exception:
+        return None
 
 
 def cancel_fix_task(task_id: int) -> bool:

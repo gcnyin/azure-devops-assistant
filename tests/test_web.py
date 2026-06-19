@@ -233,6 +233,118 @@ class TestApiFixesRoute:
         assert "error" in data
 
 
+class TestApiFixesRetryRoute:
+    """POST /api/fixes/<task_id>/retry 路由测试"""
+
+    def test_retry_nonexistent_task_returns_404(self, client):
+        resp = client.post("/api/fixes/99999/retry")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "not found" in data["message"].lower()
+
+    def test_retry_failed_task_creates_new(self, client, mocker):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(500, "Bug to Retry", sprint_name="Sprint 1", work_item_type="Bug")
+        update_fix_task_status(tid, "failed", error="timeout", finished_at="now")
+
+        mock_enqueue = mocker.patch("web.enqueue_fix_tasks", return_value=[42])
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["task_id"] == 42
+        assert data["original_task_id"] == tid
+        # 验证入队调用
+        mock_enqueue.assert_called_once()
+        args, kwargs = mock_enqueue.call_args
+        bugs_list = args[0]
+        assert bugs_list[0]["id"] == 500
+        assert bugs_list[0]["title"] == "Bug to Retry"
+        assert kwargs.get("sprint_name") == "Sprint 1"
+
+    def test_retry_cancelled_task_creates_new(self, client, mocker):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(501, "Cancelled Bug", sprint_name="Sprint 2")
+        update_fix_task_status(tid, "cancelled", finished_at="now")
+
+        mock_enqueue = mocker.patch("web.enqueue_fix_tasks", return_value=[99])
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["task_id"] == 99
+
+    def test_retry_completed_task_returns_400(self, client):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(502, "Completed Bug")
+        update_fix_task_status(tid, "completed", response="done", finished_at="now")
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "completed" in data["message"].lower()
+
+    def test_retry_pending_task_returns_400(self, client):
+        from db import init_db, create_fix_task
+        init_db()
+        tid = create_fix_task(503, "Pending Bug")
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "pending" in data["message"].lower()
+
+    def test_retry_running_task_returns_400(self, client):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(504, "Running Bug")
+        update_fix_task_status(tid, "running", started_at="now")
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["ok"] is False
+
+    def test_retry_enqueue_exception_returns_500(self, client, mocker):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(505, "Bug Retry Fail", sprint_name="Sprint X")
+        update_fix_task_status(tid, "failed", error="old error", finished_at="now")
+
+        mocker.patch("web.enqueue_fix_tasks", side_effect=RuntimeError("queue full"))
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert data["ok"] is False
+        assert "error" in data
+
+    def test_retry_with_auth_required(self, client):
+        set_web_access_token("secret123")
+        resp = client.post("/api/fixes/1/retry")
+        assert resp.status_code == 401
+
+    def test_retry_with_correct_token(self, client, mocker):
+        from db import init_db, create_fix_task, update_fix_task_status
+        init_db()
+        tid = create_fix_task(506, "Auth Retry Bug")
+        update_fix_task_status(tid, "failed", error="x", finished_at="now")
+        set_web_access_token("secret123")
+
+        mocker.patch("web.enqueue_fix_tasks", return_value=[77])
+        resp = client.post(
+            f"/api/fixes/{tid}/retry",
+            headers={"Authorization": "Bearer secret123"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["task_id"] == 77
+        set_web_access_token("")
+
+
 class TestApiHistoryRoute:
     """GET /api/history 路由测试"""
 

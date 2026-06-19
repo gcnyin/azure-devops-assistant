@@ -15,7 +15,8 @@ from flask import Flask, jsonify, request, Response, send_file
 
 from db import (
     list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
-    get_fix_tasks, get_bug_fix_status_map, cancel_fix_task, ALL_STATUSES,
+    get_fix_tasks, get_bug_fix_status_map, get_fix_task_by_id,
+    cancel_fix_task, ALL_STATUSES, RETRYABLE_STATUSES,
     list_sprint_summaries, load_latest_snapshot_by_sprint,
     save_snapshot,
     load_all_config, save_config,
@@ -520,6 +521,46 @@ def api_fixes_cancel(task_id: int):
             "task_id": task_id,
             "message": f"Task #{task_id} not found or already in a final state",
         }), 404
+
+
+@app.route("/api/fixes/<int:task_id>/retry", methods=["POST"])
+def api_fixes_retry(task_id: int):
+    task = get_fix_task_by_id(task_id)
+    if task is None:
+        return jsonify({
+            "ok": False,
+            "task_id": task_id,
+            "message": f"Task #{task_id} not found",
+        }), 404
+
+    if task["status"] not in RETRYABLE_STATUSES:
+        return jsonify({
+            "ok": False,
+            "task_id": task_id,
+            "message": f"Task #{task_id} is in status '{task['status']}', must be failed or cancelled to retry",
+        }), 400
+
+    bug = {
+        "id": task["bug_id"],
+        "title": task["bug_title"],
+        "type": task.get("work_item_type", "Bug"),
+        "description": "",
+        "htmlUrl": "",
+    }
+    sprint_name = task.get("sprint_name", "")
+
+    try:
+        new_task_ids = enqueue_fix_tasks([bug], sprint_name=sprint_name)
+        new_id = new_task_ids[0] if new_task_ids else None
+        return jsonify({
+            "ok": True,
+            "task_id": new_id,
+            "original_task_id": task_id,
+            "message": f"Task #{task_id} retried as task #{new_id}",
+        })
+    except Exception as e:
+        logger.error("Retry task #%d failed: %s", task_id, e)
+        return jsonify({"ok": False, "task_id": task_id, "error": str(e)}), 500
 
 
 @app.route("/api/history")
