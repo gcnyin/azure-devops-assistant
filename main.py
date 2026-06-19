@@ -104,7 +104,7 @@ def fetch_data(
                         len(new_items),
                         sum(1 for it in cont_items if it.get("_state_changed")),
                         len(gone_items))
-        save_snapshot(iteration["name"], client.team_name, snapshot_items)
+    save_snapshot(iteration["name"], client.team_name, snapshot_items)
     return iteration, items, diff_info
 
 
