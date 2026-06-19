@@ -194,6 +194,13 @@ export default function SettingsRoute() {
         if (result.config) {
           setForm({ ...result.config });
         }
+        // 检查是否有需要重启才能生效的字段被修改
+        const patChanged = editedSensitive.has("azure_devops_pat");
+        const azureRestartFields = SECTIONS.azure.fields.filter(f => f.restartNote && f.key !== "azure_devops_pat");
+        const azureChanged = azureRestartFields.some(f => form[f.key] !== settings[f.key]);
+        if (patChanged || azureChanged) {
+          toast.warning("Azure DevOps 连接设置已变更，需重启服务后生效");
+        }
         setEditedSensitive(new Set());
         setErrors({});
       } else if (result.errors) {
