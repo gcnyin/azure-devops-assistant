@@ -459,7 +459,12 @@ def api_fixes():
         elif len(parts) > 1:
             status = parts
 
-    bug_id = int(bug_id_str) if bug_id_str else None
+    bug_id = None
+    if bug_id_str:
+        try:
+            bug_id = int(bug_id_str)
+        except ValueError:
+            return jsonify({"error": "bug_id must be an integer"}), 400
 
     tasks = get_fix_tasks(status=status, bug_id=bug_id)
     return jsonify(tasks)

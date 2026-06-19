@@ -225,6 +225,13 @@ class TestApiFixesRoute:
         data = resp.get_json()
         assert isinstance(data, list)
 
+    def test_bug_id_non_numeric_returns_400(self, client):
+        """非数字 bug_id 返回 400 而不是 500"""
+        resp = client.get("/api/fixes?bug_id=abc")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "error" in data
+
 
 class TestApiHistoryRoute:
     """GET /api/history 路由测试"""
