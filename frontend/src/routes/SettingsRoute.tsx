@@ -61,7 +61,8 @@ const SECTIONS: Record<SectionKey, { description: string; fields: FieldDef[] }> 
     description: "变化通知渠道配置。即时生效。",
     fields: [
       { key: "notify_desktop", label: "桌面通知", placeholder: "true/false", hint: "true 或 false" },
-      { key: "notify_webhook_url", label: "Webhook URL", placeholder: "https://hooks.slack.com/services/xxx", hint: "Slack/Teams 兼容" },
+      { key: "notify_webhook_url", label: "Webhook URL (Sprint 变化通知)", placeholder: "https://hooks.slack.com/services/xxx", hint: "通用 Webhook，Sprint 变化通知发送至此" },
+      { key: "notify_pr_webhook_url", label: "PR Webhook URL (独立)", placeholder: "https://hooks.slack.com/services/xxx", hint: "留空则复用上方 Webhook URL" },
     ],
   },
   security: {
@@ -170,6 +171,11 @@ export default function SettingsRoute() {
     const webhook = form.notify_webhook_url.trim();
     if (webhook && !webhook.startsWith("http://") && !webhook.startsWith("https://")) {
       newErrors.notify_webhook_url = "必须以 http:// 或 https:// 开头";
+    }
+
+    const prWebhook = form.notify_pr_webhook_url.trim();
+    if (prWebhook && !prWebhook.startsWith("http://") && !prWebhook.startsWith("https://")) {
+      newErrors.notify_pr_webhook_url = "必须以 http:// 或 https:// 开头";
     }
 
     if (Object.keys(newErrors).length > 0) {

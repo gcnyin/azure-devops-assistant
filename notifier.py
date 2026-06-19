@@ -169,8 +169,9 @@ def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int, confi
     if config.NOTIFY_DESKTOP:
         _send_desktop(title, body)
 
-    # Webhook 通知
-    if config.NOTIFY_WEBHOOK_URL:
+    # Webhook 通知 — 若有独立 PR Webhook 则用独立的，否则复用通用 Webhook
+    pr_webhook = config.NOTIFY_PR_WEBHOOK_URL or config.NOTIFY_WEBHOOK_URL
+    if pr_webhook:
         bug_title = bug.get("title", "N/A")
         payload = {
             "attachments": [
@@ -187,5 +188,5 @@ def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int, confi
                 }
             ]
         }
-        _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
+        _send_webhook(pr_webhook, payload)
 

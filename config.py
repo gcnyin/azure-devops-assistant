@@ -71,6 +71,10 @@ class Config:
         self.NOTIFY_WEBHOOK_URL: str = (
             kwargs.get("NOTIFY_WEBHOOK_URL") or os.getenv("NOTIFY_WEBHOOK_URL", "")
         )
+        notify_pr_val = kwargs.get("NOTIFY_PR_WEBHOOK_URL")
+        if notify_pr_val is None:
+            notify_pr_val = os.getenv("NOTIFY_PR_WEBHOOK_URL", "")
+        self.NOTIFY_PR_WEBHOOK_URL: str = notify_pr_val or self.NOTIFY_WEBHOOK_URL
 
         # ── Web 认证 ──
         # 设置后，所有 Web API 路由（除 /health）都要求请求头携带 Authorization: Bearer <token>

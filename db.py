@@ -394,6 +394,7 @@ _CONFIG_META: dict[str, tuple[str, bool]] = {
     "target_branch": ("develop", False),
     "notify_desktop": ("false", False),
     "notify_webhook_url": ("", False),
+    "notify_pr_webhook_url": ("", False),
     "web_access_token": ("", True),
     "log_dir": ("", False),
     "ai_provider": ("auto", False),
@@ -433,6 +434,7 @@ def init_config_from_env(config_obj) -> bool:
         "target_branch": config_obj.TARGET_BRANCH,
         "notify_desktop": "true" if config_obj.NOTIFY_DESKTOP else "false",
         "notify_webhook_url": config_obj.NOTIFY_WEBHOOK_URL,
+        "notify_pr_webhook_url": config_obj.NOTIFY_PR_WEBHOOK_URL,
         "web_access_token": config_obj.WEB_ACCESS_TOKEN,
         "log_dir": config_obj.LOG_DIR,
     }
@@ -514,6 +516,11 @@ def save_config(data: dict[str, str]) -> tuple[dict[str, str], list[str]]:
     if webhook:
         if not (webhook.startswith("http://") or webhook.startswith("https://")):
             errors.append("notify_webhook_url: 必须以 http:// 或 https:// 开头")
+
+    pr_wh = data.get("notify_pr_webhook_url", "").strip()
+    if pr_wh:
+        if not (pr_wh.startswith("http://") or pr_wh.startswith("https://")):
+            errors.append("notify_pr_webhook_url: 必须以 http:// 或 https:// 开头")
 
     if errors:
         return load_all_config(for_api=True), errors

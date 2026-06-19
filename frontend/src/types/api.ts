@@ -133,6 +133,7 @@ export interface SettingsData {
   target_branch: string;
   notify_desktop: string;
   notify_webhook_url: string;
+  notify_pr_webhook_url: string;
   web_access_token: string;
   log_dir: string;
   ai_provider: string;
