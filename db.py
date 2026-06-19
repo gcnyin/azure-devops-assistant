@@ -550,14 +550,3 @@ def save_config(data: dict[str, str]) -> tuple[dict[str, str], list[str]]:
     logger.info("配置已保存: %d 项", len(data))
     return load_all_config(for_api=True), []
 
-
-def get_config_value(key: str, default: str = "") -> str:
-    """读取单个配置值（用于运行时读取，不掩码）"""
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT value FROM app_config WHERE key = ?", (key,)
-        ).fetchone()
-        if row:
-            return row["value"]
-    _, _sensitive = _CONFIG_META.get(key, (default, False))
-    return default
