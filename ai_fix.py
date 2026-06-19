@@ -29,7 +29,6 @@ _worker_thread: threading.Thread | None = None
 _work_dir: str = "."
 _timeout_seconds: int = 300
 _target_branch: str = "develop"
-_agent_name: str = ""
 _ai_provider: str = "auto"
 _ai_model: str = ""
 _ai_api_base_url: str = ""
