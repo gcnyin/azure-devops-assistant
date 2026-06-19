@@ -145,7 +145,103 @@ class TestSendWebhook:
         assert "Webhook 通知发送异常" in mock_logger.call_args[0][0]
 
 
+# ── notify_pr_created 测试 ──
+
+class TestNotifyPrCreated:
+    """PR 创建通知测试"""
+
+    def test_desktop_only(self, mocker):
+        """仅桌面通知时发送桌面，不发送 Webhook"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_pr_created
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="")
+        notify_pr_created({"title": "登录Bug", "id": 42}, "my-repo",
+                         "https://dev.azure.com/org/_git/my-repo/pullrequest/1",
+                         42, cfg)
+
+        mock_desktop.assert_called_once()
+        title, body = mock_desktop.call_args[0][0], mock_desktop.call_args[0][1]
+        assert "AB#42" in title
+        assert "my-repo" in body
+        assert "登录Bug" in body
+        assert "dev.azure.com" in body
+        mock_webhook.assert_not_called()
+
+    def test_webhook_only(self, mocker):
+        """仅 Webhook 时发送 Webhook，不发送桌面"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_pr_created
+
+        cfg = _make_config(NOTIFY_DESKTOP=False, NOTIFY_WEBHOOK_URL="https://hooks.example.com/webhook")
+        notify_pr_created({"title": "修复权限", "id": 99}, "auth-svc",
+                         "https://dev.azure.com/org/_git/auth-svc/pullrequest/7",
+                         99, cfg)
+
+        mock_desktop.assert_not_called()
+        mock_webhook.assert_called_once()
+        payload = mock_webhook.call_args[0][1]
+        att = payload["attachments"][0]
+        assert att["color"] == "#6366f1"
+        assert "AB#99" in att["title"]
+        assert "修复权限" in att["text"]
+        assert "auth-svc" in att["text"]
+        assert "|修复权限" in att["text"]  # Slack link format
+        assert att["fields"][0]["value"] == "auth-svc"
+
+    def test_both_enabled(self, mocker):
+        """桌面和 Webhook 都启用时两者都发送"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_pr_created
+
+        cfg = _make_config(NOTIFY_DESKTOP=True, NOTIFY_WEBHOOK_URL="https://hooks.example.com/webhook")
+        notify_pr_created({"title": "全渠道通知", "id": 1}, "core",
+                         "https://dev.azure.com/org/_git/core/pullrequest/1",
+                         1, cfg)
+
+        mock_desktop.assert_called_once()
+        mock_webhook.assert_called_once()
+
+    def test_neither_enabled_no_notification(self, mocker):
+        """桌面和 Webhook 都未启用时不发送通知"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_pr_created
+
+        cfg = _make_config(NOTIFY_DESKTOP=False, NOTIFY_WEBHOOK_URL="")
+        notify_pr_created({"title": "静默", "id": 0}, "silent",
+                         "https://dev.azure.com/org/_git/silent/pullrequest/0",
+                         0, cfg)
+
+        mock_desktop.assert_not_called()
+        mock_webhook.assert_not_called()
+
+    def test_default_config_when_none_passed(self, mocker):
+        """未传 config 时内部创建 Config 实例（不崩溃）"""
+        mock_desktop = mocker.patch("notifier._send_desktop")
+        mock_webhook = mocker.patch("notifier._send_webhook")
+
+        from notifier import notify_pr_created
+
+        # 未传 config，内部 Config() 会读取环境变量
+        notify_pr_created({"title": "默认配置", "id": 7}, "default-repo",
+                         "https://dev.azure.com/org/_git/default-repo/pullrequest/7",
+                         7)
+
+        # 环境变量中 NOTIFY_DESKTOP/NOTIFY_WEBHOOK_URL 未设置，所以不发
+        mock_desktop.assert_not_called()
+        mock_webhook.assert_not_called()
+
+
 # ── notify_changes 测试 ──
+
 
 def _make_iteration(name="Sprint 1", start="2026-01-01", finish="2026-01-15"):
     return {

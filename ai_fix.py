@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import threading
 
+from config import Config
 from azure_devops import AzureDevOpsClient
 from db import (
     CANCELLABLE_STATUSES,
@@ -498,7 +499,7 @@ def _push_and_create_pr(
             pr_results.append({**repo_result, "branch": branch_name,
                                "pr_url": pr_url, "repo_name": repo_name})
             try:
-                notify_pr_created(bug, repo_name, pr_url, bug_id)
+                notify_pr_created(bug, repo_name, pr_url, bug_id, Config())
             except Exception:
                 logger.exception("PR 通知发送失败")
         else:

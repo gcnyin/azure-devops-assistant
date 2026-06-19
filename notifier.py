@@ -158,9 +158,34 @@ def notify_changes(
         _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
 
 
-def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int):
-    """PR 创建成功时发送桌面通知（包含 PR 链接）"""
+def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int, config: Config | None = None):
+    """PR 创建成功时发送桌面通知和 Webhook 通知（包含 PR 链接）"""
     title = f"[AI Fix] PR Created - AB#{bug_id}"
     body = f"{repo_name}: {bug.get('title', 'N/A')[:60]}\n{pr_url}"
-    _send_desktop(title, body)
+    if config is None:
+        config = Config()
+
+    # 桌面通知
+    if config.NOTIFY_DESKTOP:
+        _send_desktop(title, body)
+
+    # Webhook 通知
+    if config.NOTIFY_WEBHOOK_URL:
+        bug_title = bug.get("title", "N/A")
+        payload = {
+            "attachments": [
+                {
+                    "color": "#6366f1",  # indigo
+                    "title": title,
+                    "text": f"<{pr_url}|{bug_title}> in {repo_name}",
+                    "fields": [
+                        {"title": "仓库", "value": repo_name, "short": True},
+                        {"title": "状态", "value": "待审查", "short": True},
+                    ],
+                    "footer": "Azure DevOps AI Fix",
+                    "ts": int(datetime.now().timestamp()),
+                }
+            ]
+        }
+        _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
 
