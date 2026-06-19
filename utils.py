@@ -38,11 +38,6 @@ class _BaseFormatter(logging.Formatter):
 class _FileFormatter(_BaseFormatter):
     """文件日志 Formatter：包含完整调用栈"""
 
-    def format(self, record):
-        if record.exc_info and not record.exc_text:
-            record.exc_text = self.formatException(record.exc_info)
-        return super().format(record)
-
 
 class _ConsoleFormatter(_BaseFormatter):
     """终端日志 Formatter：只显示异常类型和消息，不打印调用栈"""
