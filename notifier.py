@@ -235,35 +235,4 @@ def notify_fix_result(bug: dict, bug_id: int, success: bool, error: str = "",
         _send_webhook(webhook_url, payload)
 
 
-def notify_pr_created(bug: dict, repo_name: str, pr_url: str, bug_id: int, config: Config | None = None):
-    """PR 创建成功时发送桌面通知和 Webhook 通知（包含 PR 链接）"""
-    title = f"[AI Fix] PR Created - AB#{bug_id}"
-    body = f"{repo_name}: {bug.get('title', 'N/A')[:60]}\n{pr_url}"
-    if config is None:
-        config = Config()
-
-    # 桌面通知
-    if config.NOTIFY_DESKTOP:
-        _send_desktop(title, body)
-
-    # Webhook 通知 — 若有独立 PR Webhook 则用独立的，否则复用通用 Webhook
-    pr_webhook = config.NOTIFY_PR_WEBHOOK_URL or config.NOTIFY_WEBHOOK_URL
-    if pr_webhook:
-        bug_title = bug.get("title", "N/A")
-        payload = {
-            "attachments": [
-                {
-                    "color": "#6366f1",  # indigo
-                    "title": title,
-                    "text": f"<{pr_url}|{bug_title}> in {repo_name}",
-                    "fields": [
-                        {"title": "仓库", "value": repo_name, "short": True},
-                        {"title": "状态", "value": "待审查", "short": True},
-                    ],
-                    "footer": "Azure DevOps AI Fix",
-                    "ts": int(datetime.now().timestamp()),
-                }
-            ]
-        }
-        _send_webhook(pr_webhook, payload)
 
