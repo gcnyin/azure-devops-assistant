@@ -175,8 +175,10 @@ export function WorkItemsTable({
 
   columns.push(
     { id: "id", header: "ID", size: 68, accessorFn: (r) => r.id,
+      meta: { cellClassName: "table-cell" },
       cell: ({ getValue }) => <span className="text-ink font-medium tabular-nums">{String(getValue())}</span> },
     { id: "title", header: "Title", accessorFn: (r) => r.title,
+      meta: { cellClassName: "table-cell" },
       cell: ({ row: tr }) => {
         const it = tr.original; let p = "", c = "";
         if (rowType === "new") { p = "+ "; c = "text-success font-medium"; }
@@ -185,8 +187,10 @@ export function WorkItemsTable({
         return <span className={c}>{p}{it.title}</span>;
       }},
     { id: "type", header: "Type", size: 72, accessorFn: (r) => r.type,
+      meta: { cellClassName: "hidden sm:table-cell" },
       cell: ({ getValue }) => <span className="text-ink-body">{String(getValue())}</span> },
     { id: "state", header: "State", size: 120, accessorFn: (r) => r.state,
+      meta: { cellClassName: "table-cell" },
       cell: ({ row: tr }) => {
         const it = tr.original; const prev = it._prev_state;
         if (rowType === "changed" && prev) {
@@ -201,8 +205,10 @@ export function WorkItemsTable({
         return <span className="state-badge" style={{ background: `${c}24`, color: c }}>{it.state}</span>;
       }},
     { id: "assignedTo", header: "Owner", size: 96, accessorFn: (r) => r.assignedTo || "Unassigned",
+      meta: { cellClassName: "hidden md:table-cell" },
       cell: ({ getValue }) => <span className="text-ink-body font-medium">{String(getValue())}</span> },
     { id: "createdDate", header: "Created", size: 88, accessorFn: (r) => r.createdDate || "",
+      meta: { cellClassName: "hidden lg:table-cell" },
       cell: ({ getValue }) => {
         const v = String(getValue());
         return <span className="text-ink-soft tabular-nums">{v ? v.slice(0, 10) : "-"}</span>;
@@ -211,6 +217,7 @@ export function WorkItemsTable({
 
   if (showDiffColumn) {
     columns.push({ id: "change", header: "Change", size: 76,
+      meta: { cellClassName: "hidden sm:table-cell" },
       cell: () => {
         if (diffType === "new") return <span className="diff-tag new">New</span>;
         if (diffType === "changed") return <span className="diff-tag changed">Changed</span>;
@@ -223,6 +230,7 @@ export function WorkItemsTable({
   if (showFixColumn) {
     columns.unshift({
       id: "select", header: "", size: 40, enableSorting: false,
+      meta: { cellClassName: "table-cell" },
       cell: ({ row: tr }) => {
         const it = tr.original;
         const isBug = (it.type || "").toLowerCase() === "bug";
@@ -243,6 +251,7 @@ export function WorkItemsTable({
     });
     columns.push({
       id: "fix", header: "AI Fix", size: 100, minSize: 110, enableSorting: false,
+      meta: { cellClassName: "table-cell" },
       cell: ({ row: tr }) => (
         <FixCell item={tr.original} onTriggerFix={onTriggerFix} onViewFix={onViewFix} />
       ),
@@ -264,6 +273,7 @@ export function WorkItemsTable({
             {hg.headers.map((h) => (
               <TableHead key={h.id} style={{ width: h.getSize() }}
                 className={h.column.getCanSort() ? "cursor-pointer select-none" : ""}
+                responsiveClassName={(h.column.columnDef.meta as any)?.cellClassName}
                 onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}>
                 {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                 {h.column.getIsSorted() === "asc" ? " \u2191" : h.column.getIsSorted() === "desc" ? " \u2193" : ""}
@@ -279,7 +289,7 @@ export function WorkItemsTable({
           return (
             <TableRow key={row.id} className={rc} onClick={() => onRowClick?.(row.original)}>
               {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                <TableCell key={cell.id} responsiveClassName={(cell.column.columnDef.meta as any)?.cellClassName}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
               ))}
             </TableRow>
           );
