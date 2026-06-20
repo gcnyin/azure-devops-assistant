@@ -57,6 +57,7 @@ export function FixesView() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { data: fixes } = useFixes(undefined, activeBugId);
   const fixesMutation = useFixesMutation();
   const cancelMutation = useCancelFixMutation();
@@ -66,7 +67,7 @@ export function FixesView() {
   const grouped = useMemo(() => { const g: Record<string, FixItem[]> = {}; for (const f of filtered) { if (!g[f.status]) g[f.status] = []; g[f.status].push(f); } return g; }, [filtered]);
   const selectedFix = useMemo(() => (selectedId !== null && fixes) ? fixes.find(f => f.id === selectedId) || null : null, [selectedId, fixes]);
 
-  const firstOpen = Object.keys(grouped).find(k => grouped[k].length > 0) || "";
+  const effectiveOpen = openGroup !== null ? openGroup : Object.keys(grouped).find(k => grouped[k].length > 0) || "";
 
   return (
     <div className="flex gap-0 h-full min-h-0">
@@ -89,7 +90,7 @@ export function FixesView() {
               <div className="text-[13px] text-ink-soft">{q?`No fixes match "${q}"`:activeBugId?`No fix tasks for Bug #${activeBugId}`:"Trigger fixes from the Board view."}</div>
             </div>
           ) : (
-            <Accordion type="single" value={firstOpen} onValueChange={()=>{}}>
+            <Accordion type="single" value={effectiveOpen} onValueChange={setOpenGroup}>
               {STATUS_GROUPS.map(group => {
                 const items = grouped[group.key] || []; if (!items.length) return null;
                 return (
