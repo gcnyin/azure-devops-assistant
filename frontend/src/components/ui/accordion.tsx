@@ -23,7 +23,7 @@ interface AccordionProps {
 export function Accordion({ value, onValueChange, children }: AccordionProps) {
   return (
     <AccordionContext.Provider value={{ value, onValueChange }}>
-      <div className="border border-hairline rounded-xl overflow-hidden divide-y divide-hairline">{children}</div>
+      <div className="border border-hairline rounded-[12px] overflow-hidden divide-y divide-hairline">{children}</div>
     </AccordionContext.Provider>
   );
 }

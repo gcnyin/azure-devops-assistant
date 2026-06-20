@@ -109,7 +109,7 @@ export function NotificationPopover({
       {open && (
         <div
           ref={panelRef}
-          className="absolute top-full right-0 mt-2 w-52 bg-canvas border border-hairline rounded-xl shadow-lg z-50 p-3"
+          className="absolute top-full right-0 mt-2 w-52 bg-canvas border border-hairline rounded-[12px] shadow-lg z-50 p-3"
         >
           {/* 主开关 */}
           <div className="flex items-center justify-between mb-3">

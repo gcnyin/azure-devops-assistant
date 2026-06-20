@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from "react-router";
-import { useBoardData, useSprints } from "@/hooks/useApi";
 import { useCallback, useEffect, useState } from "react";
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; }
@@ -27,17 +26,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   // Below md (768px): always collapsed, ignore manual toggle
   const effectiveCollapsed = isMobile ? true : collapsed;
 
-  const { data: sprintsData } = useSprints();
-  const activeSprint = sprintsData?.current_sprint || "";
-  const { data: boardData } = useBoardData("all", "");
-
   const pathname = location.pathname;
   let activeId = "board";
   if (pathname.startsWith("/fixes")) activeId = "fixes";
   else if (pathname.startsWith("/history")) activeId = "history";
   else if (pathname.startsWith("/settings")) activeId = "settings";
-
-  const sprintName = boardData?.iteration?.name || activeSprint || "";
 
   const handleNav = useCallback((path: string) => { navigate(path); }, [navigate]);
 
@@ -47,27 +40,36 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         effectiveCollapsed ? "w-[56px]" : "w-[220px]"
       }`}
     >
-      {/* Collapse toggle — hidden on mobile (auto-collapsed) */}
-      <div className={`flex items-center h-14 px-3 ${isMobile ? "justify-center" : ""}`}>
-        {!effectiveCollapsed && (
-          <span className="text-sm font-medium text-on-dark truncate flex-1">Sprint Monitor</span>
-        )}
-        {!isMobile && (
-          <button
-            onClick={onToggle}
-            className={`p-1.5 rounded-md text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover transition-colors ${
-              collapsed ? "mx-auto" : ""
-            }`}
-            title={collapsed ? "Expand" : "Collapse"}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {collapsed ? (
-                <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M14 9l3 3-3 3" /></>
-              ) : (
-                <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M10 9l-3 3 3 3" /></>
-              )}
-            </svg>
-          </button>
+      {/* Logo / Title */}
+      <div className={`flex items-center h-14 px-3 ${isMobile ? "justify-center" : effectiveCollapsed ? "justify-center" : ""}`}>
+        {!effectiveCollapsed ? (
+          <>
+            <img src="/logo.svg" alt="Logo" className="w-6 h-6 shrink-0" />
+            <span className="text-sm font-medium text-on-dark truncate ml-2.5 flex-1">Sprint Monitor</span>
+            {!isMobile && (
+              <button
+                onClick={onToggle}
+                className="p-1.5 rounded-md text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover transition-colors"
+                title="Collapse"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M10 9l-3 3 3 3" />
+                </svg>
+              </button>
+            )}
+          </>
+        ) : (
+          !isMobile && (
+            <button
+              onClick={onToggle}
+              className="p-1.5 rounded-md text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover transition-colors"
+              title="Expand"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M14 9l3 3-3 3" />
+              </svg>
+            </button>
+          )
         )}
       </div>
 
@@ -94,14 +96,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Sprint name — hidden when collapsed or on mobile */}
-      {!effectiveCollapsed && sprintName && (
-        <div className="px-3 py-3 border-t border-white/[0.08]">
-          <div className="text-[12px] text-on-dark-soft tracking-[1.5px] uppercase font-medium mb-1.5">Current Sprint</div>
-          <div className="text-sm text-on-dark font-medium truncate">{sprintName}</div>
-        </div>
-      )}
     </aside>
   );
 }

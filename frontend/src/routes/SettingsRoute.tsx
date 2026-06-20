@@ -108,7 +108,7 @@ export default function SettingsRoute() {
           <select
             value={val}
             onChange={(e) => handleFieldChange(field.key, e.target.value)}
-            className="flex h-8 w-full rounded-[10px] border border-hairline bg-canvas px-3 py-1 text-[13px] text-ink shadow-none transition-colors file:border-0 file:bg-transparent file:text-[13px] file:font-medium placeholder:text-ink-muted focus-visible:outline-none focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-8 w-full rounded-[8px] border border-hairline bg-canvas px-3 py-1 text-[13px] text-ink shadow-none transition-colors file:border-0 file:bg-transparent file:text-[13px] file:font-medium placeholder:text-ink-muted focus-visible:outline-none focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="auto">auto (auto-detect)</option>
             {hasData ? agents.map((a) => (
