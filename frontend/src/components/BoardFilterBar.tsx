@@ -153,8 +153,8 @@ export function BoardFilterBar({
         {/* Spacer — hidden on small screens */}
         <div className="flex-1 hidden sm:block" />
 
-        {/* Stats — wrap to own line on small screens */}
-        <div className="flex items-center gap-2 sm:gap-3 text-[12px] sm:text-[13px] tabular-nums shrink-0 w-full sm:w-auto justify-end sm:justify-start pt-1 sm:pt-0">
+        {/* Stats */}
+        <div className="flex items-center gap-2 sm:gap-3 text-[12px] sm:text-[13px] tabular-nums shrink-0">
           <span><span className="font-medium text-ink">{totalCount}</span> <span className="text-ink-muted">Total</span></span>
           <span><span className="font-medium text-accent-amber">{openCount}</span> <span className="text-ink-muted">Open</span></span>
           <span><span className="font-medium text-success">{doneCount}</span> <span className="text-ink-muted">Done</span></span>
