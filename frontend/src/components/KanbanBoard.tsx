@@ -65,12 +65,14 @@ export function KanbanBoard({
     (col) => col.items.length > 0 || col.state === "Done"
   );
 
+  const useMultiCol = visibleColumns.length <= 3;
+
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin" style={{ minHeight: "calc(100vh - 220px)" }}>
       {visibleColumns.map((col) => (
         <KanbanColumn
           key={col.state} state={col.state} items={col.items} stateColors={stateColors}
-          rowType={diffFilter || undefined} selectedItemId={selectedItemId}
+          multiCol={useMultiCol} rowType={diffFilter || undefined} selectedItemId={selectedItemId}
           dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
         />
       ))}
