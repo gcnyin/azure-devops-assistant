@@ -9,7 +9,7 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { useFixes, useFixesMutation, useCancelFixMutation } from "@/hooks/useApi";
+import { useFixes, useFixDetail, useFixesMutation, useCancelFixMutation } from "@/hooks/useApi";
 import type { FixItem, FixRepoResult } from "@/types/api";
 
 const STATUS_GROUPS = [
@@ -64,9 +64,11 @@ export function FixesView() {
   const cancelMutation = useCancelFixMutation();
 
   const clearBugId = () => { setSearchParams((p)=>{const n=new URLSearchParams(p);n.delete("bug_id");return n;});setSelectedId(null); };
-  const filtered = useMemo(() => (!fixes ? [] : !q ? fixes : fixes.filter(f => String(f.bug_id).includes(q.toLowerCase()) || (f.bug_title||"").toLowerCase().includes(q.toLowerCase()) || (f.response||"").toLowerCase().includes(q.toLowerCase()) || (f.error||"").toLowerCase().includes(q.toLowerCase()))), [fixes, q]);
+  const filtered = useMemo(() => (!fixes ? [] : !q ? fixes : fixes.filter(f => String(f.bug_id).includes(q.toLowerCase()) || (f.bug_title||"").toLowerCase().includes(q.toLowerCase()) || (f.error||"").toLowerCase().includes(q.toLowerCase()))), [fixes, q]);
   const grouped = useMemo(() => { const g: Record<string, FixItem[]> = {}; for (const f of filtered) { if (!g[f.status]) g[f.status] = []; g[f.status].push(f); } return g; }, [filtered]);
-  const selectedFix = useMemo(() => (selectedId !== null && fixes) ? fixes.find(f => f.id === selectedId) || null : null, [selectedId, fixes]);
+  const listFix = (selectedId !== null && fixes) ? fixes.find(f => f.id === selectedId) || null : null;
+  const { data: fixDetail } = useFixDetail(selectedId);
+  const selectedFix = fixDetail || listFix;
 
   const effectiveOpen = openGroup !== null ? openGroup : Object.keys(grouped).find(k => grouped[k].length > 0) || "";
 

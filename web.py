@@ -514,7 +514,20 @@ def api_fixes():
             return jsonify({"error": "bug_id must be an integer"}), 400
 
     tasks = get_fix_tasks(status=status, bug_id=bug_id)
+    # Strip heavy fields from list response to keep payloads small
+    for t in tasks:
+        t.pop("response", None)
+        t.pop("prompt", None)
+        t.pop("repo_results", None)
     return jsonify(tasks)
+
+
+@app.route("/api/fixes/<int:task_id>")
+def api_fix_detail(task_id: int):
+    task = get_fix_task_by_id(task_id)
+    if task is None:
+        return jsonify({"error": f"Fix task #{task_id} not found"}), 404
+    return jsonify(task)
 
 
 @app.route("/api/fixes/run", methods=["POST"])

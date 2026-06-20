@@ -101,6 +101,22 @@ export function useFixesMutation() {
   });
 }
 
+export function useFixDetail(taskId: number | null) {
+  return useQuery<FixItem>({
+    queryKey: ["fix-detail", taskId],
+    queryFn: () =>
+      fetchJson<FixItem>(`/api/fixes/${taskId}`).then((item) => ({
+        ...item,
+        repo_results:
+          typeof item.repo_results === "string"
+            ? JSON.parse(item.repo_results)
+            : item.repo_results,
+      })),
+    enabled: taskId !== null && !isNaN(taskId),
+    staleTime: 10_000,
+  });
+}
+
 export function useCancelFixMutation() {
   const queryClient = useQueryClient();
 
