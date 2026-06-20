@@ -87,7 +87,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Sprint summary */}
       {!collapsed && (
-        <div className="px-3 py-3 border-t border-hairline/20 space-y-2">
+        <div className="px-3 py-3 border-t border-white/[0.08] space-y-2">
           <div className="text-[12px] text-on-dark-soft tracking-[1.5px] uppercase font-medium">Current Sprint</div>
           <div className="text-sm text-on-dark font-medium truncate">{sprintName || "-"}</div>
           <div className="flex items-center gap-3 text-[13px]">
