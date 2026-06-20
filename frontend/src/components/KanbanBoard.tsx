@@ -60,16 +60,21 @@ export function KanbanBoard({
     return ordered;
   }, [items, incompleteStates]);
 
+  // Filter: hide empty columns except Done (anchor column)
+  const visibleColumns = columns.filter(
+    (col) => col.items.length > 0 || col.state === "Done"
+  );
+
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin" style={{ minHeight: "calc(100vh - 220px)" }}>
-      {columns.map((col) => (
+      {visibleColumns.map((col) => (
         <KanbanColumn
           key={col.state} state={col.state} items={col.items} stateColors={stateColors}
           rowType={diffFilter || undefined} selectedItemId={selectedItemId}
           dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
         />
       ))}
-      {columns.length === 0 && (
+      {visibleColumns.length === 0 && (
         <div className="flex items-center justify-center w-full text-ink-muted text-[14px]">
           No work items found
         </div>
