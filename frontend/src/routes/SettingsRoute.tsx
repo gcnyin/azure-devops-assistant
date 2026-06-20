@@ -38,11 +38,8 @@ const SECTIONS: Record<SectionKey, { description: string; fields: FieldDef[] }> 
     { key: "web_access_token", label: "Web Access Token", placeholder: "Leave empty to disable auth", type: "password", sensitive: true, hint: "Enables Bearer Token auth" },
     { key: "log_dir", label: "Log Directory", placeholder: "Default: logs/", hint: "Log file location" },
   ]},
-  provider: { description: "AI Provider configuration. Applies immediately.", fields: [
+  provider: { description: "AI Agent used for auto-fix. Applies immediately.", fields: [
     { key: "ai_provider", label: "AI Agent", placeholder: "auto / pi / claude / opencode / codex", hint: "auto = detect available agent" },
-    { key: "ai_model", label: "AI Model", placeholder: "claude-sonnet-4-20250514 / gpt-4o" },
-    { key: "ai_api_base_url", label: "Custom API Base URL", placeholder: "https://api.openai.com/v1" },
-    { key: "ai_api_key", label: "AI API Key", placeholder: "sk-...", type: "password", sensitive: true },
   ]},
 };
 
