@@ -65,7 +65,7 @@ export function KanbanCard({
 
   return (
     <div
-      className={`bg-surface-card rounded-[8px] cursor-pointer transition-all select-none border ${ds.pad} ${
+      className={`bg-surface-card rounded-[8px] cursor-pointer transition-all select-none border max-w-[480px] ${ds.pad} ${
         isSelected
           ? "border-primary ring-[3px] ring-primary/15"
           : isDimmed

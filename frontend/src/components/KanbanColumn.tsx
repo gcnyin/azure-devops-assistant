@@ -60,7 +60,7 @@ export function KanbanColumn({
   return (
     <div
       ref={columnRef}
-      className="flex flex-col flex-1 min-w-[220px] max-w-[480px] border border-hairline rounded-[12px] overflow-hidden bg-canvas"
+      className="flex flex-col flex-1 min-w-[220px] bg-canvas"
     >
       {/* Column header */}
       <div className="px-3 py-2.5" style={{ background: "var(--color-surface-cream-strong)" }}>

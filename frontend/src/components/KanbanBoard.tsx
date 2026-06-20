@@ -17,31 +17,33 @@ interface KanbanBoardProps {
 
 function SkeletonBoard() {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin flex-1 min-h-0">
-      {[1, 2, 3].map((col) => (
-        <div key={col} className="flex flex-col flex-1 min-w-[220px] max-w-[480px] border border-hairline rounded-[12px] overflow-hidden bg-canvas">
-          <div className="px-3 py-2.5" style={{ background: "var(--color-surface-cream-strong)" }}>
-            <Skeleton className="h-4 w-24" />
-          </div>
-          <div className="flex-1 px-3 py-3 space-y-2">
-            {[1, 2, 3, 4, 5].map((card) => (
-              <div key={card} className="bg-surface-card rounded-[8px] px-3.5 py-3 space-y-2.5">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-10 rounded-full" />
-                  <Skeleton className="h-3 w-8" />
+    <div className="border border-hairline rounded-[12px] overflow-hidden flex-1 min-h-0">
+      <div className="flex divide-x divide-hairline overflow-x-auto pb-3 scrollbar-thin h-full">
+        {[1, 2, 3].map((col) => (
+          <div key={col} className="flex flex-col flex-1 min-w-[220px] bg-canvas">
+            <div className="px-3 py-2.5" style={{ background: "var(--color-surface-cream-strong)" }}>
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <div className="flex-1 px-3 py-3 space-y-2">
+              {[1, 2, 3, 4, 5].map((card) => (
+                <div key={card} className="bg-surface-card rounded-[8px] px-3.5 py-3 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-10 rounded-full" />
+                    <Skeleton className="h-3 w-8" />
+                  </div>
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="flex items-center gap-2 pt-1">
+                    <Skeleton className="h-2 w-2 rounded-full" />
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-14 ml-auto" />
+                  </div>
                 </div>
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <div className="flex items-center gap-2 pt-1">
-                  <Skeleton className="h-2 w-2 rounded-full" />
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-3 w-14 ml-auto" />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -106,14 +108,16 @@ export function KanbanBoard({
   const useMultiCol = visibleColumns.length <= 4;
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin flex-1 min-h-0">
-      {visibleColumns.map((col) => (
-        <KanbanColumn
-          key={col.state} state={col.state} items={col.items} stateColors={stateColors}
-          multiCol={useMultiCol} rowType={diffFilter || undefined} selectedItemId={selectedItemId}
-          dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
-        />
-      ))}
+    <div className="border border-hairline rounded-[12px] overflow-hidden flex-1 min-h-0">
+      <div className="flex divide-x divide-hairline overflow-x-auto pb-3 scrollbar-thin h-full">
+        {visibleColumns.map((col) => (
+          <KanbanColumn
+            key={col.state} state={col.state} items={col.items} stateColors={stateColors}
+            multiCol={useMultiCol} rowType={diffFilter || undefined} selectedItemId={selectedItemId}
+            dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
+          />
+        ))}
+      </div>
     </div>
   );
 }
