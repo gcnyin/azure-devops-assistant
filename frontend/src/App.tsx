@@ -5,7 +5,6 @@ import { BoardRoute } from "@/routes/BoardRoute";
 import FixesRoute from "@/routes/FixesRoute";
 import SettingsRoute from "@/routes/SettingsRoute";
 import { HistoryView } from "@/components/HistoryView";
-import { SnapshotDetail } from "@/components/SnapshotDetail";
 import { DiffView } from "@/components/DiffView";
 
 export default function App() {
@@ -15,9 +14,9 @@ export default function App() {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: "#181715",
+            background: "#252320",
             color: "#faf9f5",
-            border: "1px solid #252320",
+            border: "1px solid #2e2c28",
           },
         }}
       />
@@ -26,7 +25,6 @@ export default function App() {
           <Route index element={<BoardRoute />} />
           <Route path="fixes" element={<FixesRoute />} />
           <Route path="history" element={<HistoryView />} />
-          <Route path="history/:id" element={<SnapshotDetail />} />
           <Route path="diff/:idA/:idB" element={<DiffView />} />
           <Route path="settings" element={<SettingsRoute />} />
         </Route>

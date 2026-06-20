@@ -1,14 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { WorkItemsTable } from "@/components/WorkItemsTable";
-import { DetailModal } from "@/components/DetailModal";
+import { KanbanBoard } from "@/components/KanbanBoard";
+import { BoardFilterBar } from "@/components/BoardFilterBar";
+import { RightPanel } from "@/components/RightPanel";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { NotificationPopover } from "@/components/NotificationPopover";
-import { StatsRow } from "@/components/StatsRow";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
 import { useBrowserNotification } from "@/hooks/useBrowserNotification";
@@ -25,19 +22,20 @@ interface BoardViewProps {
 export function BoardView({ data, incompleteStates, stateColors, isError, error }: BoardViewProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const view = searchParams.get("view") || "all";
+  const view = (searchParams.get("view") || "all") as "all" | "me";
   const searchQuery = searchParams.get("q") || "";
-  const stateFilter = searchParams.get("state") || "all";
   const diffFilterParam = searchParams.get("diff") || "";
+  const layoutParam = searchParams.get("layout") || "kanban";
+  const selectedParam = searchParams.get("selected");
 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone"
       ? diffFilterParam : null;
 
+  const layoutMode = (layoutParam === "table" ? "table" : "kanban") as "kanban" | "table";
+
   const fixesMutation = useFixesMutation();
   const refreshMutation = useRefreshMutation();
-  const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
-  const [searchText, setSearchText] = useState(searchQuery);
   const [checkedBugIds, setCheckedBugIds] = useState<Set<number>>(new Set());
 
   const handleNotifyNavigate = useCallback((params: Record<string, string>) => {
@@ -49,48 +47,70 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     navigate(`/${qs ? `?${qs}` : ""}`);
   }, [navigate]);
 
-  const {
-    permission, enabled, categories,
-    requestPermission, toggleEnabled, toggleCategory, notifyRefresh,
-  } = useBrowserNotification(data, handleNotifyNavigate);
+  const { notifyRefresh } = useBrowserNotification(data, handleNotifyNavigate);
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
 
-  const filteredItems = useFilteredItems(allItems, diff, diffFilter, stateFilter, searchQuery, incompleteStates);
+  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates);
 
-  const incompleteSet = new Set(incompleteStates.map((s) => s.toLowerCase()));
-  let incCount = 0, compCount = 0;
-  for (const it of allItems) {
-    if (incompleteSet.has(it.state.toLowerCase())) incCount++; else compCount++;
-  }
+  // Selected item for right panel
+  const selectedItem = useMemo(() => {
+    if (!selectedParam) return null;
+    const id = parseInt(selectedParam, 10);
+    if (isNaN(id)) return null;
+    return allItems.find((it) => it.id === id) || null;
+  }, [selectedParam, allItems]);
 
-  const updateParam = useCallback((key: string, value: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (value && value !== "all") next.set(key, value); else next.delete(key);
-      return next;
-    });
-  }, [setSearchParams]);
-
-  const setView = (v: string) => {
+  const setView = useCallback((v: "all" | "me") => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (v === "me") next.set("view", "me"); else next.delete("view");
       return next;
     });
-  };
+  }, [setSearchParams]);
 
-  const handleSearch = (value: string) => {
-    setSearchText(value);
+  const handleSearch = useCallback((value: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (value) next.set("q", value); else next.delete("q");
       return next;
     });
-  };
+  }, [setSearchParams]);
 
-  const handleTriggerFix = (bugId: number) => {
+  const handleDiffFilter = useCallback((f: DiffFilterType | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (f) next.set("diff", f); else next.delete("diff");
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const handleLayoutChange = useCallback((m: "kanban" | "table") => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (m === "table") next.set("layout", "table"); else next.delete("layout");
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const handleCardClick = useCallback((item: WorkItem) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("selected", String(item.id));
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const handleClosePanel = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("selected");
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const handleTriggerFix = useCallback((bugId: number) => {
     fixesMutation.mutate([bugId], {
       onSuccess: (result) => {
         if (result.ok) toast.success(result.message || "Fix task queued");
@@ -98,9 +118,9 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       },
       onError: () => toast.error("Failed to queue fix task"),
     });
-  };
+  }, [fixesMutation]);
 
-  const handleBulkFix = () => {
+  const handleBulkFix = useCallback(() => {
     const ids = Array.from(checkedBugIds);
     if (ids.length === 0) return;
     fixesMutation.mutate(ids, {
@@ -114,7 +134,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       },
       onError: () => toast.error("Failed to queue fix tasks"),
     });
-  };
+  }, [checkedBugIds, fixesMutation]);
 
   const toggleBugCheck = useCallback((bugId: number) => {
     setCheckedBugIds((prev) => {
@@ -124,32 +144,19 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     });
   }, []);
 
-  const handleViewFix = (bugId: number) => {
-    navigate(`/fixes?bug_id=${bugId}`);
-  };
-
-  const nn = diff?.new_items?.length || 0;
-  const nc = diff?.continuing_items?.filter((it) => it._state_changed).length || 0;
-  const ng = diff?.gone_items?.length || 0;
-
-  const stateMap: Record<string, number> = {};
-  for (const it of allItems) stateMap[it.state] = (stateMap[it.state] || 0) + 1;
-  let bugCount = 0;
-  for (const it of allItems) { if ((it.type || "").toLowerCase() === "bug") bugCount++; }
-
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     refreshMutation.mutate(undefined, {
       onSuccess: (result) => {
         if (result.ok) {
           const di = result.diff_info as DiffInfo | null | undefined;
           if (di) notifyRefresh(di);
-          const nn2 = di?.new_items?.length || 0;
-          const nc2 = di?.continuing_items?.filter((it) => it._state_changed).length || 0;
-          const ng2 = di?.gone_items?.length || 0;
+          const nn = di?.new_items?.length || 0;
+          const nc = di?.continuing_items?.filter((it) => it._state_changed).length || 0;
+          const ng = di?.gone_items?.length || 0;
           const parts: string[] = [];
-          if (nn2 > 0) parts.push(`+${nn2} new`);
-          if (nc2 > 0) parts.push(`~${nc2} changed`);
-          if (ng2 > 0) parts.push(`-${ng2} gone`);
+          if (nn > 0) parts.push(`+${nn} new`);
+          if (nc > 0) parts.push(`~${nc} changed`);
+          if (ng > 0) parts.push(`-${ng} gone`);
           toast.success(parts.length ? `Data refreshed: ${parts.join(", ")}` : result.message || "Data refreshed");
         } else {
           toast.error(result.error || "Refresh failed");
@@ -157,130 +164,101 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       },
       onError: () => toast.error("Refresh request failed"),
     });
-  };
+  }, [refreshMutation, notifyRefresh]);
+
+  // Dimmed item IDs for search filtering in kanban
+  const dimmedItemIds = useMemo(() => {
+    if (!searchQuery) return new Set<number>();
+    const q = searchQuery.toLowerCase();
+    const matching = allItems.filter((it) =>
+      String(it.id).includes(q) ||
+      (it.title || "").toLowerCase().includes(q) ||
+      (it.assignedTo || "").toLowerCase().includes(q) ||
+      (it.state || "").toLowerCase().includes(q)
+    );
+    const matchingIds = new Set(matching.map((it) => it.id));
+    const dimmed = new Set<number>();
+    for (const it of allItems) {
+      if (!matchingIds.has(it.id)) dimmed.add(it.id);
+    }
+    return dimmed;
+  }, [searchQuery, allItems]);
+
+  const isPanelOpen = selectedItem !== null;
 
   return (
-    <div>
-      {data?.error && <ErrorBanner message={data.error} />}
-      {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load board data"} />}
+    <div className="flex gap-0 h-full min-h-0">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0" style={isPanelOpen ? { maxWidth: "calc(100% - 480px)" } : undefined}>
+        {data?.error && <ErrorBanner message={data.error} />}
+        {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load board data"} />}
 
-      <div className="flex items-center gap-1 mb-6">
-        <span className="text-sm text-ink-muted mr-1">View:</span>
-        <Button variant={view === "all" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-          onClick={() => setView("all")}>All</Button>
-        <Button variant={view === "me" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-          onClick={() => setView("me")}>Me</Button>
-        <NotificationPopover
-          permission={permission}
-          enabled={enabled}
-          categories={categories}
-          onToggleEnabled={toggleEnabled}
-          onToggleCategory={toggleCategory}
-          onRequestPermission={requestPermission}
+        <BoardFilterBar
+          view={view}
+          onViewChange={setView}
+          searchQuery={searchQuery}
+          onSearchChange={handleSearch}
+          diffInfo={diff}
+          diffFilter={diffFilter}
+          onDiffFilterChange={handleDiffFilter}
+          layoutMode={layoutMode}
+          onLayoutChange={handleLayoutChange}
+          onRefresh={handleRefresh}
+          refreshPending={refreshMutation.isPending}
+          checkedBugCount={checkedBugIds.size}
+          onBulkFix={handleBulkFix}
+          bulkFixPending={fixesMutation.isPending}
         />
-        <div className="flex-1" />
-        {checkedBugIds.size > 0 && (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="rounded-lg"
-            disabled={fixesMutation.isPending}
-            onClick={handleBulkFix}
-          >
-            {fixesMutation.isPending ? "Fixing..." : `Fix selected (${checkedBugIds.size})`}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-lg"
-          disabled={refreshMutation.isPending}
-          onClick={handleRefresh}
-        >
-          {refreshMutation.isPending ? "Refreshing..." : "Refresh"}
-        </Button>
-      </div>
 
-      <div className="flex items-center gap-3 mb-6 flex-wrap max-md:flex-col max-md:items-stretch max-md:gap-2">
-        <div className="relative flex-[0_1_320px] min-w-[180px] max-md:flex-none max-md:w-full">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft pointer-events-none">S</span>
-          <Input className="pl-[38px]" placeholder="Filter work items..." value={searchText}
-            onChange={(e) => handleSearch(e.target.value)} />
-        </div>
-
-        <div className="flex items-center gap-1 flex-wrap max-md:overflow-x-auto max-md:flex-nowrap max-md:pb-1">
-          <Button variant={stateFilter === "all" && !diffFilter ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-            onClick={() => updateParam("state", "all")}>All</Button>
-          <Button variant={stateFilter === "open" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-            onClick={() => updateParam("state", "open")}>Open <span className="text-ink-soft ml-1 text-xs">{incCount}</span></Button>
-          <Button variant={stateFilter === "done" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-            onClick={() => updateParam("state", "done")}>Done <span className="text-ink-soft ml-1 text-xs">{compCount}</span></Button>
-          {bugCount > 0 && (
-            <Button variant={stateFilter === "bug" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-              onClick={() => updateParam("state", "bug")}>Bug <span className="text-ink-soft ml-1 text-xs">{bugCount}</span></Button>
-          )}
-          {Object.entries(stateMap)
-            .filter(([st]) => {
-              const lower = st.toLowerCase();
-              return lower !== "open" && lower !== "done" && lower !== "bug" && lower !== "all";
-            })
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([st, cnt]) => (
-            <Button key={st} variant={stateFilter === st.toLowerCase() ? "secondary" : "ghost"} size="sm" className="rounded-lg"
-              onClick={() => updateParam("state", st.toLowerCase())}>{st} <span className="text-ink-soft ml-1 text-xs">{cnt}</span></Button>
-          ))}
-        </div>
-
-        <div className="flex-1 max-md:hidden" />
-        <span className="text-[13px] text-ink-muted whitespace-nowrap max-md:self-start">
-          {filteredItems.length !== allItems.length || searchQuery || diffFilter
-            ? `${filteredItems.length} / ${allItems.length} items` : ""}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3 max-md:flex-col max-md:items-start max-md:gap-2">
-        <StatsRow total={allItems.length} open={incCount} done={compCount} />
-        <div className="flex items-center gap-2 flex-wrap">
-          {nn > 0 && <Badge variant="outline"
-            className={`diff-tag new cursor-pointer hover:brightness-110 select-none ${diffFilter === "new" ? "outline-2 outline-offset-1 outline-success" : ""}`}
-            onClick={() => updateParam("diff", diffFilter === "new" ? "" : "new")}>+{nn} New</Badge>}
-          {nc > 0 && <Badge variant="outline"
-            className={`diff-tag changed cursor-pointer hover:brightness-110 select-none ${diffFilter === "changed" ? "outline-2 outline-offset-1 outline-accent-amber" : ""}`}
-            onClick={() => updateParam("diff", diffFilter === "changed" ? "" : "changed")}>~{nc} Changed</Badge>}
-          {ng > 0 && <Badge variant="outline"
-            className={`diff-tag gone cursor-pointer hover:brightness-110 select-none ${diffFilter === "gone" ? "outline-2 outline-offset-1 outline-error" : ""}`}
-            onClick={() => updateParam("diff", diffFilter === "gone" ? "" : "gone")}>-{ng} Gone</Badge>}
-        </div>
-      </div>
-
-      <div className="table-wrap">
-        {filteredItems.length === 0 && !data && !isError ? (
-          <div className="text-center py-16 text-ink-muted">Loading...</div>
-        ) : filteredItems.length === 0 && data ? (
-          <div className="flex flex-col items-center py-24 text-ink-muted">
-            <div className="text-4xl mb-3 opacity-60">-</div>
-            <div className="text-base text-ink-strong font-medium mb-2">No results</div>
-            <div className="text-sm max-w-[30ch] text-ink-soft">
-              {diffFilter === "gone" ? "No items have disappeared from this sprint."
-                : searchQuery ? `No items match "${searchQuery}"` : "No work items in this sprint."}
+        <div className="flex-1 min-h-0">
+          {filteredItems.length === 0 && !data && !isError ? (
+            <div className="flex items-center justify-center h-64 text-ink-muted text-sm">Loading...</div>
+          ) : filteredItems.length === 0 && data ? (
+            <div className="flex flex-col items-center justify-center h-64 text-ink-muted">
+              <div className="text-4xl mb-3 opacity-60">-</div>
+              <div className="text-sm font-medium text-ink-strong mb-1">No results</div>
+              <div className="text-xs text-ink-soft">
+                {searchQuery ? `No items match "${searchQuery}"` : "No work items in this sprint."}
+              </div>
             </div>
-          </div>
-        ) : (
-          <WorkItemsTable
-            items={filteredItems}
-            rowType={diffFilter || undefined}
-            onRowClick={setSelectedItem}
-            stateColors={stateColors}
-            showFixColumn
-            onTriggerFix={handleTriggerFix}
-            onViewFix={handleViewFix}
-            checkedBugIds={checkedBugIds}
-            onToggleBugCheck={toggleBugCheck}
-          />
-        )}
+          ) : layoutMode === "kanban" ? (
+            <KanbanBoard
+              items={filteredItems}
+              incompleteStates={incompleteStates}
+              stateColors={stateColors}
+              diffFilter={diffFilter}
+              selectedItemId={selectedItem?.id ?? null}
+              dimmedItemIds={searchQuery ? dimmedItemIds : new Set()}
+              onCardClick={handleCardClick}
+              onTriggerFix={handleTriggerFix}
+            />
+          ) : (
+            <div className="table-wrap">
+              <WorkItemsTable
+                items={filteredItems}
+                rowType={diffFilter || undefined}
+                onRowClick={handleCardClick}
+                stateColors={stateColors}
+                showFixColumn
+                onTriggerFix={handleTriggerFix}
+                onViewFix={(bugId) => navigate(`/fixes?bug_id=${bugId}`)}
+                checkedBugIds={checkedBugIds}
+                onToggleBugCheck={toggleBugCheck}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      <DetailModal item={selectedItem} stateColors={stateColors} onClose={() => setSelectedItem(null)} />
+      {/* Right panel */}
+      {isPanelOpen && (
+        <RightPanel
+          item={selectedItem}
+          stateColors={stateColors}
+          onClose={handleClosePanel}
+          onTriggerFix={handleTriggerFix}
+        />
+      )}
     </div>
   );
 }
