@@ -7,18 +7,17 @@ import { useBoardData, useConfig } from "@/hooks/useApi";
 export function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchParams] = useSearchParams();
-  const view = searchParams.get("view") || "all";
   const sprintParam = searchParams.get("sprint") || "";
-  const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData(view, sprintParam);
+  const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData("all", sprintParam);
   const { data: config } = useConfig();
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
   const handleExport = useCallback(() => {
-    const params = new URLSearchParams({ format: "csv", view });
+    const params = new URLSearchParams({ format: "csv", view: "all" });
     if (sprintParam) params.set("sprint", sprintParam);
     const link = document.createElement("a"); link.href = `/api/export?${params}`; link.download = "";
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  }, [view, sprintParam]);
+  }, [sprintParam]);
 
   return (
     <div className="flex h-screen overflow-hidden">

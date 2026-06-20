@@ -22,7 +22,6 @@ interface BoardViewProps {
 export function BoardView({ data, incompleteStates, stateColors, isError, error }: BoardViewProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const view = (searchParams.get("view") || "all") as "all" | "me";
   const searchQuery = searchParams.get("q") || "";
   const diffFilterParam = searchParams.get("diff") || "";
   const layoutParam = searchParams.get("layout") || "kanban";
@@ -49,17 +48,15 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
+  const currentUser = data?.assigned_to || "";
 
   const availableTypes = useMemo(() => {
     const typeMap: Record<string, number> = {};
     for (const it of allItems) {
-      const t = (it.type || "").trim();
-      if (!t) continue;
+      const t = (it.type || "").trim(); if (!t) continue;
       typeMap[t] = (typeMap[t] || 0) + 1;
     }
-    return Object.entries(typeMap)
-      .map(([type, count]) => ({ type, count }))
-      .sort((a, b) => a.type.localeCompare(b.type));
+    return Object.entries(typeMap).map(([type, count]) => ({ type, count })).sort((a, b) => a.type.localeCompare(b.type));
   }, [allItems]);
 
   const availableAssignees = useMemo(() => {
@@ -69,8 +66,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       if (!n) { nameMap["Unassigned"] = (nameMap["Unassigned"] || 0) + 1; continue; }
       nameMap[n] = (nameMap[n] || 0) + 1;
     }
-    return Object.entries(nameMap)
-      .map(([name, count]) => ({ name, count }))
+    return Object.entries(nameMap).map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [allItems]);
 
@@ -82,9 +78,6 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     return isNaN(id) ? null : allItems.find((it) => it.id === id) || null;
   }, [selectedParam, allItems]);
 
-  const setView = useCallback((v: "all" | "me") => {
-    setSearchParams((prev) => { const n = new URLSearchParams(prev); v === "me" ? n.set("view", "me") : n.delete("view"); return n; });
-  }, [setSearchParams]);
   const handleSearch = useCallback((value: string) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); value ? n.set("q", value) : n.delete("q"); return n; });
   }, [setSearchParams]);
@@ -139,13 +132,16 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         {data?.error && <ErrorBanner message={data.error} />}
         {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load"} />}
 
-        <BoardFilterBar view={view} onViewChange={setView} searchQuery={searchQuery} onSearchChange={handleSearch}
+        <BoardFilterBar
+          searchQuery={searchQuery} onSearchChange={handleSearch}
           availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
-          availableAssignees={availableAssignees} assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
+          availableAssignees={availableAssignees} currentUser={currentUser}
+          assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
           diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
           layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
           onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
-          checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending} />
+          checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending}
+        />
 
         <div className="flex-1 min-h-0">
           {filteredItems.length === 0 && !data && !isError ? (

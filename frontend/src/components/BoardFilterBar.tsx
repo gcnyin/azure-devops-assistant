@@ -4,14 +4,13 @@ import type { DiffInfo, DiffFilterType } from "@/types/api";
 import { useState, useRef, useEffect } from "react";
 
 interface BoardFilterBarProps {
-  view: "all" | "me";
-  onViewChange: (v: "all" | "me") => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   availableTypes: { type: string; count: number }[];
   typeFilter: string | null;
   onTypeFilterChange: (t: string | null) => void;
   availableAssignees: { name: string; count: number }[];
+  currentUser: string;
   assigneeFilter: string | null;
   onAssigneeFilterChange: (a: string | null) => void;
   diffInfo: DiffInfo | null;
@@ -34,13 +33,13 @@ const TYPE_STYLES: Record<string, { activeBg: string; activeText: string; active
   epic:   { activeBg: "bg-fuchsia-700/10", activeText: "text-fuchsia-600", activeBorder: "border-fuchsia-600/30" },
   issue:  { activeBg: "bg-error/10",    activeText: "text-error",       activeBorder: "border-error/30" },
 };
-
 const DEFAULT_TYPE_STYLE = { activeBg: "bg-ink-muted/10", activeText: "text-ink-muted", activeBorder: "border-ink-muted/30" };
 
 export function BoardFilterBar({
-  view, onViewChange, searchQuery, onSearchChange,
+  searchQuery, onSearchChange,
   availableTypes, typeFilter, onTypeFilterChange,
-  availableAssignees, assigneeFilter, onAssigneeFilterChange,
+  availableAssignees, currentUser,
+  assigneeFilter, onAssigneeFilterChange,
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
@@ -50,94 +49,89 @@ export function BoardFilterBar({
   const ng = diffInfo?.gone_items?.length || 0;
 
   return (
-    <div className="flex items-center gap-2 py-2 flex-wrap">
-      {/* View toggle */}
-      <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
-        <button className={`px-3 py-1.5 text-[14px] font-medium rounded-[6px] transition-colors ${view === "all" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
-          onClick={() => onViewChange("all")}>All</button>
-        <button className={`px-3 py-1.5 text-[14px] font-medium rounded-[6px] transition-colors ${view === "me" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
-          onClick={() => onViewChange("me")}>Me</button>
+    <div className="space-y-2 pb-2">
+      {/* ═══ Row 1: Filters ═══ */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </span>
+          <Input className="pl-8 h-8 text-[13px]" placeholder="Search by title, ID, or keyword..." value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)} />
+        </div>
+
+        {/* Type pills */}
+        {availableTypes.map((t) => {
+          const isActive = typeFilter?.toLowerCase() === t.type.toLowerCase();
+          const style = TYPE_STYLES[t.type.toLowerCase()] || DEFAULT_TYPE_STYLE;
+          return (
+            <button key={t.type}
+              className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
+                isActive ? `${style.activeBg} ${style.activeText} ${style.activeBorder}` : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
+              }`}
+              onClick={() => onTypeFilterChange(isActive ? null : t.type)}>
+              {t.type}<span className="ml-1 opacity-60 text-[11px]">{t.count}</span>
+            </button>
+          );
+        })}
+
+        {/* Assignee dropdown */}
+        {availableAssignees.length > 0 && (
+          <AssigneeDropdown
+            assignees={availableAssignees}
+            currentUser={currentUser}
+            selected={assigneeFilter}
+            onSelect={onAssigneeFilterChange}
+          />
+        )}
+
+        {/* Diff badges */}
+        <span className="text-hairline select-none mx-1">|</span>
+        {nn > 0 && (
+          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
+            onClick={() => onDiffFilterChange(diffFilter === "new" ? null : "new")}>+{nn} New</span>
+        )}
+        {nc > 0 && (
+          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "changed" ? "diff-tag active-changed" : ""}`}
+            onClick={() => onDiffFilterChange(diffFilter === "changed" ? null : "changed")}>~{nc} Changed</span>
+        )}
+        {ng > 0 && (
+          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "gone" ? "diff-tag active-gone" : ""}`}
+            onClick={() => onDiffFilterChange(diffFilter === "gone" ? null : "gone")}>-{ng} Gone</span>
+        )}
       </div>
 
-      {/* Search */}
-      <div className="relative flex-1 min-w-[160px] max-w-[300px]">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </span>
-        <Input className="pl-8 h-8 text-[13px]" placeholder="Filter cards..." value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)} />
-      </div>
-
-      {/* Type filter pills */}
-      {availableTypes.map((t) => {
-        const isActive = typeFilter?.toLowerCase() === t.type.toLowerCase();
-        const style = TYPE_STYLES[t.type.toLowerCase()] || DEFAULT_TYPE_STYLE;
-        return (
-          <button
-            key={t.type}
-            className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
-              isActive
-                ? `${style.activeBg} ${style.activeText} ${style.activeBorder}`
-                : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
-            }`}
-            onClick={() => onTypeFilterChange(isActive ? null : t.type)}
-          >
-            {t.type}
-            <span className="ml-1 opacity-60 text-[11px]">{t.count}</span>
+      {/* ═══ Row 2: Actions ═══ */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Layout toggle */}
+        <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
+          <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+            onClick={() => onLayoutChange("kanban")} title="Kanban view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="10" rx="1" /></svg>
           </button>
-        );
-      })}
+          <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+            onClick={() => onLayoutChange("table")} title="Table view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
+          </button>
+        </div>
 
-      {/* Assignee filter dropdown */}
-      {availableAssignees.length > 0 && (
-        <AssigneeDropdown
-          assignees={availableAssignees}
-          selected={assigneeFilter}
-          onSelect={onAssigneeFilterChange}
-        />
-      )}
-
-      {/* Diff badges */}
-      {nn > 0 && (
-        <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
-          onClick={() => onDiffFilterChange(diffFilter === "new" ? null : "new")}>+{nn} New</span>
-      )}
-      {nc > 0 && (
-        <span className={`diff-tag cursor-pointer select-none ${diffFilter === "changed" ? "diff-tag active-changed" : ""}`}
-          onClick={() => onDiffFilterChange(diffFilter === "changed" ? null : "changed")}>~{nc} Changed</span>
-      )}
-      {ng > 0 && (
-        <span className={`diff-tag cursor-pointer select-none ${diffFilter === "gone" ? "diff-tag active-gone" : ""}`}
-          onClick={() => onDiffFilterChange(diffFilter === "gone" ? null : "gone")}>-{ng} Gone</span>
-      )}
-
-      <div className="flex-1" />
-
-      {/* Bulk fix */}
-      {checkedBugCount > 0 && (
-        <Button variant="default" size="sm" disabled={bulkFixPending} onClick={onBulkFix}>
-          {bulkFixPending ? "Fixing..." : `Fix selected (${checkedBugCount})`}
+        {/* Refresh */}
+        <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh}>
+          {refreshPending ? "Refreshing..." : "Refresh"}
         </Button>
-      )}
 
-      {/* Layout toggle */}
-      <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
-        <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
-          onClick={() => onLayoutChange("kanban")} title="Kanban view">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="10" rx="1" /></svg>
-        </button>
-        <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
-          onClick={() => onLayoutChange("table")} title="Table view">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
-        </button>
+        <div className="flex-1" />
+
+        {/* Bulk fix */}
+        {checkedBugCount > 0 && (
+          <Button variant="default" size="sm" disabled={bulkFixPending} onClick={onBulkFix}>
+            {bulkFixPending ? "Fixing..." : `Fix selected (${checkedBugCount})`}
+          </Button>
+        )}
       </div>
-
-      {/* Refresh */}
-      <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh}>
-        {refreshPending ? "Refreshing..." : "Refresh"}
-      </Button>
     </div>
   );
 }
@@ -145,11 +139,10 @@ export function BoardFilterBar({
 /* ── Assignee searchable dropdown ── */
 
 function AssigneeDropdown({
-  assignees,
-  selected,
-  onSelect,
+  assignees, currentUser, selected, onSelect,
 }: {
   assignees: { name: string; count: number }[];
+  currentUser: string;
   selected: string | null;
   onSelect: (a: string | null) => void;
 }) {
@@ -169,6 +162,8 @@ function AssigneeDropdown({
     ? assignees.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()))
     : assignees;
 
+  const isMe = (name: string) => currentUser && name.toLowerCase() === currentUser.toLowerCase();
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -182,52 +177,46 @@ function AssigneeDropdown({
         {selected ? (
           <>
             {selected}
-            <span
-              className="ml-0.5 text-[11px] opacity-60 hover:opacity-100 cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}
-            >
+            <span className="ml-0.5 text-[11px] opacity-60 hover:opacity-100 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}>
               &times;
             </span>
           </>
         ) : (
-          "Assigned"
+          <>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+            Assigned
+          </>
         )}
       </button>
 
       {open && (
         <div className="absolute top-full left-0 mt-1 w-52 bg-canvas border border-hairline rounded-[12px] shadow-lg z-50 overflow-hidden">
           <div className="p-1.5">
-            <input
-              type="text"
+            <input type="text"
               className="w-full px-2.5 py-1.5 text-[13px] bg-surface-card rounded-[8px] border-none outline-none text-ink placeholder:text-ink-muted"
-              placeholder="Search people..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              autoFocus
-            />
+              placeholder="Search people..." value={filter}
+              onChange={(e) => setFilter(e.target.value)} autoFocus />
           </div>
-          <div className="max-h-48 overflow-y-auto scrollbar-thin">
-            {/* All option */}
-            <button
-              className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${
-                !selected ? "text-primary font-medium" : "text-ink-muted"
-              }`}
-              onClick={() => { onSelect(null); setOpen(false); }}
-            >
+          <div className="max-h-52 overflow-y-auto scrollbar-thin">
+            <button className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${!selected ? "text-primary font-medium" : "text-ink-muted"}`}
+              onClick={() => { onSelect(null); setOpen(false); }}>
               Everyone
             </button>
             {filtered.map((a) => {
               const isActive = selected?.toLowerCase() === a.name.toLowerCase();
+              const isCurrentUser = isMe(a.name);
               return (
-                <button
-                  key={a.name}
-                  className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${
+                <button key={a.name}
+                  className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card flex items-center gap-2 ${
                     isActive ? "text-primary font-medium" : "text-ink-muted"
                   }`}
-                  onClick={() => { onSelect(a.name); setOpen(false); }}
-                >
+                  onClick={() => { onSelect(a.name); setOpen(false); }}>
                   <span>{a.name}</span>
-                  <span className="ml-2 text-[11px] opacity-50">{a.count}</span>
+                  {isCurrentUser && <span className="text-[10px] bg-primary/10 text-primary px-1 py-px rounded-full font-medium">Me</span>}
+                  <span className="ml-auto text-[11px] opacity-50">{a.count}</span>
                 </button>
               );
             })}
