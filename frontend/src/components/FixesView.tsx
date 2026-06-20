@@ -140,7 +140,7 @@ export function FixesView() {
           </div>
           <div className="px-4 py-2 border-b border-hairline shrink-0 flex items-center gap-2">
             {(selectedFix.status==="pending"||selectedFix.status==="running")&&<Button variant="ghost" size="sm" className="text-error hover:bg-error/10" disabled={cancellingId===selectedFix.id} onClick={()=>{setCancellingId(selectedFix.id);cancelMutation.mutate(selectedFix.id,{onSuccess:(r)=>{setCancellingId(null);toast[r.ok?"success":"error"](r.ok?`Task #${selectedFix.id} cancelled`:r.message||"Failed");},onError:()=>{setCancellingId(null);toast.error("Failed");}});}}>{cancellingId===selectedFix.id?"Cancelling...":"Cancel"}</Button>}
-            {(selectedFix.status==="failed"||selectedFix.status==="completed")&&<Button variant="ghost" size="sm" onClick={()=>fixesMutation.mutate([selectedFix.bug_id],{onSuccess:(r)=>toast[r.ok?"success":"error"](r.ok?"Retry queued":r.error||"Failed"),onError:()=>toast.error("Failed")})}>Retry</Button>}
+            {(selectedFix.status==="failed"||selectedFix.status==="cancelled")&&<Button variant="ghost" size="sm" onClick={()=>fixesMutation.mutate([selectedFix.bug_id],{onSuccess:(r)=>toast[r.ok?"success":"error"](r.ok?"Retry queued":r.error||"Failed"),onError:()=>toast.error("Failed")})}>Retry</Button>}
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3 scrollbar-thin">
             {selectedFix.status==="pending" ? <div className="text-[14px] text-ink-muted italic py-8 text-center">Waiting in queue...</div>
