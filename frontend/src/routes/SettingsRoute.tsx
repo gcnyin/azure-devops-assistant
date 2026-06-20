@@ -6,9 +6,9 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { useSettings, useSaveSettings } from "@/hooks/useApi";
 import type { SettingsData } from "@/types/api";
 
-type SectionKey = "azure" | "query" | "ai" | "notify" | "security" | "provider";
+type SectionKey = "azure" | "query" | "ai" | "provider";
 const SECTION_LABELS: Record<SectionKey, string> = {
-  azure: "Azure DevOps", query: "Query Settings", ai: "AI Fixes", notify: "Notifications", security: "Security", provider: "AI Provider",
+  azure: "Azure DevOps", query: "Query Settings", ai: "AI Fixes", provider: "AI Agent",
 };
 
 interface FieldDef { key: keyof SettingsData; label: string; placeholder?: string; type?: string; hint?: string; sensitive?: boolean; restartNote?: boolean; }
@@ -28,15 +28,6 @@ const SECTIONS: Record<SectionKey, { description: string; fields: FieldDef[] }> 
     { key: "work_dir", label: "Code Repository Directory", placeholder: "/path/to/code/repo", hint: "Git repository path" },
     { key: "ai_fix_timeout_seconds", label: "AI Fix Timeout (sec)", placeholder: "300", type: "number", hint: "Default 300s (5 min)" },
     { key: "target_branch", label: "Target Branch", placeholder: "develop", hint: "PR merge target branch" },
-  ]},
-  notify: { description: "Change notification channels. Applies immediately.", fields: [
-    { key: "notify_desktop", label: "Desktop Notifications", placeholder: "true/false", hint: "true or false" },
-    { key: "notify_webhook_url", label: "Webhook URL (Sprint changes)", placeholder: "https://hooks.slack.com/services/xxx" },
-    { key: "notify_pr_webhook_url", label: "PR Webhook URL (separate)", placeholder: "https://hooks.slack.com/services/xxx", hint: "Leave empty to reuse above" },
-  ]},
-  security: { description: "Web access authentication. Applies immediately.", fields: [
-    { key: "web_access_token", label: "Web Access Token", placeholder: "Leave empty to disable auth", type: "password", sensitive: true, hint: "Enables Bearer Token auth" },
-    { key: "log_dir", label: "Log Directory", placeholder: "Default: logs/", hint: "Log file location" },
   ]},
   provider: { description: "AI Agent used for auto-fix. Applies immediately.", fields: [
     { key: "ai_provider", label: "AI Agent", placeholder: "auto / pi / claude / opencode / codex", hint: "auto = detect available agent" },
@@ -76,10 +67,6 @@ export default function SettingsRoute() {
     if (isNaN(interval) || interval < 1) newErrors.check_interval_minutes = "Must be a positive integer (>= 1)";
     const timeout = parseInt(form.ai_fix_timeout_seconds, 10);
     if (isNaN(timeout) || timeout < 1) newErrors.ai_fix_timeout_seconds = "Must be a positive integer (>= 1)";
-    const wh = form.notify_webhook_url.trim();
-    if (wh && !wh.startsWith("http://") && !wh.startsWith("https://")) newErrors.notify_webhook_url = "Must start with http:// or https://";
-    const pwh = form.notify_pr_webhook_url.trim();
-    if (pwh && !pwh.startsWith("http://") && !pwh.startsWith("https://")) newErrors.notify_pr_webhook_url = "Must start with http:// or https://";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
