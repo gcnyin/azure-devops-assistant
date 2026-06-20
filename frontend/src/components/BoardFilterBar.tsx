@@ -19,6 +19,7 @@ interface BoardFilterBarProps {
   onDiffFilterChange: (f: DiffFilterType | null) => void;
   layoutMode: "kanban" | "table";
   onLayoutChange: (m: "kanban" | "table") => void;
+  onExport: () => void;
   onRefresh: () => void;
   refreshPending: boolean;
   checkedBugCount: number;
@@ -35,7 +36,7 @@ export function BoardFilterBar({
   availableAssignees, currentUser,
   assigneeFilter, onAssigneeFilterChange,
   diffInfo, diffFilter, onDiffFilterChange,
-  layoutMode, onLayoutChange, onRefresh, refreshPending,
+  layoutMode, onLayoutChange, onExport, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
   totalCount, openCount, doneCount,
 }: BoardFilterBarProps) {
@@ -173,6 +174,15 @@ export function BoardFilterBar({
             <span className="text-[12px] font-medium hidden sm:inline">表格</span>
           </button>
         </div>
+
+        {/* Export */}
+        <Button variant="default" size="sm" onClick={onExport} title="Export CSV" className="shrink-0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </Button>
 
         {/* Refresh */}
         <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh} title="Refresh" className="shrink-0">

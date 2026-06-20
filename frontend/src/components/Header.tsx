@@ -1,11 +1,10 @@
-import { Button } from "@/components/ui/button";
 import type { BoardData } from "@/types/api";
 
-interface HeaderProps { data?: BoardData; onExport: () => void; }
+interface HeaderProps { data?: BoardData; }
 
-export function Header({ data, onExport }: HeaderProps) {
+export function Header({ data }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between h-12 px-4 border-b border-hairline bg-canvas shrink-0">
+    <header className="flex items-center h-12 px-4 border-b border-hairline bg-canvas shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         <h1 className="text-[14px] font-medium text-ink-strong truncate">{data?.project || "Azure DevOps"}</h1>
         <span className="text-hairline select-none">|</span>
@@ -16,9 +15,6 @@ export function Header({ data, onExport }: HeaderProps) {
         {data?.offline && (
           <span className="inline-flex items-center gap-1 bg-error/10 text-error px-1.5 py-px rounded-full text-[11px] font-medium">Offline</span>
         )}
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" size="sm" onClick={onExport}>Export</Button>
       </div>
     </header>
   );

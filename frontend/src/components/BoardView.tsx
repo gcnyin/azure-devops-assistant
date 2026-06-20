@@ -28,6 +28,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const selectedParam = searchParams.get("selected");
   const typeFilterParam = searchParams.get("type") || "";
   const assigneeParam = searchParams.get("assigned") || "";
+  const sprintParam = searchParams.get("sprint") || "";
 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone" ? diffFilterParam : null;
@@ -121,6 +122,13 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     setCheckedBugIds((prev) => { const next = new Set(prev); next.has(bugId) ? next.delete(bugId) : next.add(bugId); return next; });
   }, []);
 
+  const handleExport = useCallback(() => {
+    const params = new URLSearchParams({ format: "csv", view: "all" });
+    if (sprintParam) params.set("sprint", sprintParam);
+    const link = document.createElement("a"); link.href = `/api/export?${params}`; link.download = "";
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }, [sprintParam]);
+
   const handleRefresh = useCallback(() => {
     refreshMutation.mutate(undefined, { onSuccess: (r) => { if (r.ok) { const di = r.diff_info as DiffInfo | null; if (di) notifyRefresh(di); const nn = di?.new_items?.length || 0, nc = di?.continuing_items?.filter((it: any) => it._state_changed).length || 0, ng = di?.gone_items?.length || 0; const p: string[] = []; if (nn) p.push(`+${nn} new`); if (nc) p.push(`~${nc} changed`); if (ng) p.push(`-${ng} gone`); toast.success(p.length ? `Refreshed: ${p.join(", ")}` : r.message || "Refreshed"); } else toast.error(r.error || "Failed"); }, onError: () => toast.error("Failed") });
   }, [refreshMutation, notifyRefresh]);
@@ -148,6 +156,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
         diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
         layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
+        onExport={handleExport}
         onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
         checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending}
         totalCount={totalCount} openCount={openCount} doneCount={doneCount}
