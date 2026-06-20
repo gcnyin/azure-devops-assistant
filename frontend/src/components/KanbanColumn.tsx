@@ -29,56 +29,38 @@ export function KanbanColumn({
   const hiddenCount = items.length - visibleCount;
 
   return (
-    <div className="flex flex-col bg-[var(--color-kanban-col)] border border-hairline rounded-xl min-w-[260px] w-[280px] max-w-[320px] shrink-0">
-      {/* Column header */}
-      <div className="px-3 py-2.5 border-b border-hairline rounded-t-xl bg-[var(--color-kanban-col-header)]">
+    <div className="flex flex-col min-w-[260px] w-[280px] max-w-[320px] shrink-0">
+      {/* Column header — surface-cream-strong */}
+      <div className="px-3 py-2.5 rounded-t-[12px]" style={{ background: "var(--color-surface-cream-strong)" }}>
         <div className="flex items-center gap-2">
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: sc }}
-          />
-          <span className="text-sm font-semibold text-ink-strong truncate">{state}</span>
-          <span className="text-xs text-ink-muted tabular-nums ml-auto">{items.length}</span>
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc }} />
+          <span className="text-[14px] font-medium text-ink-strong truncate">{state}</span>
+          <span className="text-[13px] text-ink-muted tabular-nums ml-auto">{items.length}</span>
         </div>
       </div>
 
       {/* Cards */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2 scrollbar-thin">
         {displayItems.length === 0 ? (
-          <div className="flex items-center justify-center h-20 text-xs text-ink-soft italic">
+          <div className="flex items-center justify-center h-16 text-[13px] text-ink-muted italic">
             No items
           </div>
         ) : (
           displayItems.map((item) => (
             <KanbanCard
-              key={item.id}
-              item={item}
-              rowType={rowType}
-              stateColors={stateColors}
-              isSelected={selectedItemId === item.id}
-              isDimmed={dimmedItemIds.has(item.id)}
-              onClick={() => onCardClick(item)}
-              onTriggerFix={onTriggerFix}
+              key={item.id} item={item} rowType={rowType} stateColors={stateColors}
+              isSelected={selectedItemId === item.id} isDimmed={dimmedItemIds.has(item.id)}
+              onClick={() => onCardClick(item)} onTriggerFix={onTriggerFix}
             />
           ))
         )}
-
-        {/* Show more / show less */}
         {hiddenCount > 0 && !showAll && (
-          <button
-            className="w-full text-xs text-ink-muted hover:text-ink py-2 text-center rounded-md hover:bg-canvas-card transition-colors"
-            onClick={() => setShowAll(true)}
-          >
-            + {hiddenCount} more...
-          </button>
+          <button className="w-full text-[13px] text-ink-muted hover:text-ink py-2 text-center rounded-[8px] hover:bg-surface-card transition-colors"
+            onClick={() => setShowAll(true)}>+ {hiddenCount} more...</button>
         )}
         {showAll && hiddenCount > 0 && (
-          <button
-            className="w-full text-xs text-ink-muted hover:text-ink py-2 text-center rounded-md hover:bg-canvas-card transition-colors"
-            onClick={() => setShowAll(false)}
-          >
-            Show less
-          </button>
+          <button className="w-full text-[13px] text-ink-muted hover:text-ink py-2 text-center rounded-[8px] hover:bg-surface-card transition-colors"
+            onClick={() => setShowAll(false)}>Show less</button>
         )}
       </div>
     </div>

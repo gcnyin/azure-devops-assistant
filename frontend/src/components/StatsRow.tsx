@@ -1,8 +1,4 @@
-interface StatsRowProps {
-  total: number;
-  open: number;
-  done: number;
-}
+interface StatsRowProps { total: number; open: number; done: number; }
 
 export function StatsRow({ total, open, done }: StatsRowProps) {
   return (

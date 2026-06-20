@@ -17,7 +17,6 @@ export function KanbanBoard({
   items, incompleteStates, stateColors, diffFilter,
   selectedItemId, dimmedItemIds, onCardClick, onTriggerFix,
 }: KanbanBoardProps) {
-  // Group items by state into ordered columns
   const columns = useMemo(() => {
     const grouped: Record<string, WorkItem[]> = {};
     const doneStates = new Set(["done", "closed", "completed", "resolved", "removed"]);
@@ -28,25 +27,20 @@ export function KanbanBoard({
       grouped[key].push(item);
     }
 
-    // Order: QUERY_STATES order first, then remaining alphabetically, then Done
     const ordered: { state: string; items: WorkItem[] }[] = [];
 
     // 1. Incomplete states in config order
     for (const st of incompleteStates) {
-      // Find matching key (case-insensitive)
-      const match = Object.keys(grouped).find(
-        (k) => k.toLowerCase() === st.toLowerCase()
-      );
+      const match = Object.keys(grouped).find((k) => k.toLowerCase() === st.toLowerCase());
       if (match) {
         ordered.push({ state: match, items: grouped[match] });
         delete grouped[match];
       } else {
-        // Column exists even if empty (for incomplete states)
         ordered.push({ state: st, items: [] });
       }
     }
 
-    // 2. Remaining states (not in incomplete and not done)
+    // 2. Remaining states alphabetical
     const remaining = Object.entries(grouped)
       .filter(([k]) => !doneStates.has(k.toLowerCase()))
       .sort(([a], [b]) => a.localeCompare(b));
@@ -55,13 +49,9 @@ export function KanbanBoard({
       delete grouped[state];
     }
 
-    // 3. Done/Closed/Completed merge into "Done"
+    // 3. Done merge
     const doneItems: WorkItem[] = [];
-    for (const [state, stateItems] of Object.entries(grouped)) {
-      doneItems.push(...stateItems);
-      delete grouped[state];
-    }
-    // Sort done items by ID descending
+    for (const [, stateItems] of Object.entries(grouped)) doneItems.push(...stateItems);
     doneItems.sort((a, b) => b.id - a.id);
     if (doneItems.length > 0 || ordered.length > 0) {
       ordered.push({ state: "Done", items: doneItems });
@@ -71,22 +61,16 @@ export function KanbanBoard({
   }, [items, incompleteStates]);
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin" style={{ minHeight: "calc(100vh - 220px)" }}>
+    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin" style={{ minHeight: "calc(100vh - 220px)" }}>
       {columns.map((col) => (
         <KanbanColumn
-          key={col.state}
-          state={col.state}
-          items={col.items}
-          stateColors={stateColors}
-          rowType={diffFilter || undefined}
-          selectedItemId={selectedItemId}
-          dimmedItemIds={dimmedItemIds}
-          onCardClick={onCardClick}
-          onTriggerFix={onTriggerFix}
+          key={col.state} state={col.state} items={col.items} stateColors={stateColors}
+          rowType={diffFilter || undefined} selectedItemId={selectedItemId}
+          dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
         />
       ))}
       {columns.length === 0 && (
-        <div className="flex items-center justify-center w-full text-ink-muted text-sm">
+        <div className="flex items-center justify-center w-full text-ink-muted text-[14px]">
           No work items found
         </div>
       )}

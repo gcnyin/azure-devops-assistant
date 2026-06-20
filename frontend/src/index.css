@@ -1,102 +1,107 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* ── Dark theme design tokens (Raycast-inspired) ── */
+/* ─────────────────────────────────────────
+ * Claude Design System Tokens
+ * cream canvas + coral primary + dark navy accents
+ * ───────────────────────────────────────── */
 @theme inline {
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Surface */
-  --color-canvas: #181715;
-  --color-canvas-soft: #1f1d1a;
-  --color-canvas-card: #252320;
-  --color-canvas-elevated: #2c2925;
-
-  /* Borders */
-  --color-hairline: #2e2c28;
-  --color-hairline-soft: #383530;
-
-  /* Text */
-  --color-ink: #faf9f5;
-  --color-ink-body: #d4d1c9;
-  --color-ink-strong: #edece8;
-  --color-ink-muted: #8e8b84;
-  --color-ink-soft: #65635d;
-
-  /* Primary */
+  /* ── Brand & Accent ── */
   --color-primary: #cc785c;
-  --color-primary-active: #e08d70;
-  --color-primary-disabled: #4a3d38;
-
-  /* Accent */
+  --color-primary-active: #a9583e;
+  --color-primary-disabled: #e6dfd8;
   --color-accent-teal: #5db8a6;
   --color-accent-amber: #e8a55a;
 
-  /* Semantic */
+  /* ── Surface / Canvas (cream hierarchy) ── */
+  --color-canvas: #faf9f5;
+  --color-surface-soft: #f5f0e8;
+  --color-surface-card: #efe9de;
+  --color-surface-cream-strong: #e8e0d2;
+
+  /* ── Surface / Dark ── */
+  --color-surface-dark: #181715;
+  --color-surface-dark-elevated: #252320;
+  --color-surface-dark-soft: #1f1e1b;
+
+  /* ── Borders ── */
+  --color-hairline: #e6dfd8;
+  --color-hairline-soft: #ebe6df;
+
+  /* ── Text ── */
+  --color-ink: #141413;
+  --color-ink-body: #3d3d3a;
+  --color-ink-strong: #252523;
+  --color-ink-muted: #6c6a64;
+  --color-ink-soft: #8e8b82;
+
+  /* ── On-dark text ── */
+  --color-on-dark: #faf9f5;
+  --color-on-dark-soft: #a09d96;
+
+  /* ── Semantic ── */
   --color-success: #5db872;
   --color-warning: #d4a017;
   --color-error: #c64545;
 
-  /* Radius */
-  --radius: 0.5rem;
+  /* ── Radius ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
 
-  /* shadcn/ui mappings */
-  --color-background: #181715;
-  --color-foreground: #faf9f5;
-  --color-card: #252320;
-  --color-card-foreground: #faf9f5;
-  --color-popover: #252320;
-  --color-popover-foreground: #faf9f5;
+  /* ── shadcn/ui mappings ── */
+  --color-background: #faf9f5;
+  --color-foreground: #141413;
+  --color-card: #efe9de;
+  --color-card-foreground: #141413;
+  --color-popover: #faf9f5;
+  --color-popover-foreground: #141413;
   --color-primary: #cc785c;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #252320;
-  --color-secondary-foreground: #faf9f5;
-  --color-muted: #252320;
-  --color-muted-foreground: #8e8b84;
-  --color-accent: #252320;
-  --color-accent-foreground: #faf9f5;
+  --color-secondary: #efe9de;
+  --color-secondary-foreground: #141413;
+  --color-muted: #efe9de;
+  --color-muted-foreground: #6c6a64;
+  --color-accent: #efe9de;
+  --color-accent-foreground: #141413;
   --color-destructive: #c64545;
   --color-destructive-foreground: #ffffff;
-  --color-border: #2e2c28;
-  --color-input: #2e2c28;
+  --color-border: #e6dfd8;
+  --color-input: #e6dfd8;
   --color-ring: #cc785c;
-
-  /* Sidebar */
-  --color-sidebar: #161512;
+  --color-sidebar: #181715;
   --color-sidebar-hover: #252320;
   --color-sidebar-active: #2c2925;
-
-  /* Kanban */
-  --color-kanban-bg: #141311;
-  --color-kanban-col: #1a1816;
-  --color-kanban-col-header: #1f1d1a;
-  --color-kanban-card: #221f1b;
-  --color-kanban-card-hover: #2c2925;
 }
 
-/* ── shadcn/ui CSS Variables ── */
 :root {
-  --background: #181715;
-  --foreground: #faf9f5;
-  --card: #252320;
-  --card-foreground: #faf9f5;
-  --popover: #252320;
-  --popover-foreground: #faf9f5;
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #efe9de;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
   --primary: #cc785c;
   --primary-foreground: #ffffff;
-  --secondary: #252320;
-  --secondary-foreground: #faf9f5;
-  --muted: #252320;
-  --muted-foreground: #8e8b84;
-  --accent: #252320;
-  --accent-foreground: #faf9f5;
+  --secondary: #efe9de;
+  --secondary-foreground: #141413;
+  --muted: #efe9de;
+  --muted-foreground: #6c6a64;
+  --accent: #efe9de;
+  --accent-foreground: #141413;
   --destructive: #c64545;
   --destructive-foreground: #ffffff;
-  --border: #2e2c28;
-  --input: #2e2c28;
+  --border: #e6dfd8;
+  --input: #e6dfd8;
   --ring: #cc785c;
-  --radius: 0.5rem;
-  --sidebar: #161512;
+  --radius: 8px;
+  --sidebar: #181715;
   --sidebar-hover: #252320;
   --sidebar-active: #2c2925;
 }
@@ -112,26 +117,42 @@
 
 /* ── Components ── */
 @layer components {
+  /* State badge — colored text on transparent / pill */
   .state-badge {
-    @apply inline-block px-1.5 py-0.5 rounded text-xs font-medium;
+    @apply inline-block px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
+  /* Diff tags — pill style, surface-card bg */
   .diff-tag {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+    background: var(--color-surface-card);
+    color: var(--color-ink);
   }
-  .diff-tag.new { @apply bg-success/15 text-success; }
-  .diff-tag.changed { @apply bg-accent-amber/15 text-accent-amber; }
-  .diff-tag.gone { @apply bg-error/15 text-error; }
+  .diff-tag.new { color: var(--color-success); }
+  .diff-tag.changed { color: var(--color-accent-amber); }
+  .diff-tag.gone { color: var(--color-error); }
 
+  .diff-tag.active-new {
+    box-shadow: 0 0 0 2px var(--color-success);
+  }
+  .diff-tag.active-changed {
+    box-shadow: 0 0 0 2px var(--color-accent-amber);
+  }
+  .diff-tag.active-gone {
+    box-shadow: 0 0 0 2px var(--color-error);
+  }
+
+  /* Table wrap */
   .table-wrap {
-    @apply bg-canvas-card border border-hairline rounded-lg overflow-hidden;
+    @apply bg-canvas border border-hairline rounded-lg overflow-hidden;
   }
 
+  /* Row diff markers */
   .row-new { box-shadow: inset 3px 0 0 0 var(--color-success); }
   .row-changed { box-shadow: inset 3px 0 0 0 var(--color-accent-amber); }
   .row-gone { @apply opacity-55; }
 
-  /* Prose */
+  /* Prose overrides */
   .prose {
     --tw-prose-body: var(--color-ink-body);
     --tw-prose-headings: var(--color-ink-strong);
@@ -150,9 +171,9 @@
     --tw-prose-pre-bg: inherit;
   }
 
-  /* Scrollbar */
-  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  /* Scrollbar — transparent, visible on hover */
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: #3d3a35; border-radius: 3px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #55514b; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-hairline); border-radius: 2px; }
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb { background: var(--color-ink-muted); }
 }

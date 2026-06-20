@@ -1,46 +1,56 @@
 import * as React from "react";
-import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+interface TabsContextValue {
+  value: string;
+  onValueChange: (value: string) => void;
+}
 
-const TabsList = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn("inline-flex items-center gap-1", className)}
-    {...props}
-  />
-));
-TabsList.displayName = TabsPrimitive.List.displayName;
+const TabsContext = React.createContext<TabsContextValue | null>(null);
 
-const TabsTrigger = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap px-3.5 py-2 text-sm font-medium text-ink-muted bg-transparent rounded-lg transition-all",
-      "hover:text-ink hover:bg-canvas-soft",
-      "data-[state=active]:bg-canvas-card data-[state=active]:text-ink",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-      "disabled:pointer-events-none disabled:opacity-50",
-      className,
-    )}
-    {...props}
-  />
-));
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+function useTabs() {
+  const ctx = React.useContext(TabsContext);
+  if (!ctx) throw new Error("Tabs components must be used within <Tabs>");
+  return ctx;
+}
 
-const TabsContent = React.forwardRef<
-  React.ComponentRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content ref={ref} className={cn("focus-visible:outline-none", className)} {...props} />
-));
-TabsContent.displayName = TabsPrimitive.Content.displayName;
+interface TabsProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export function Tabs({ value, onValueChange, children, className }: TabsProps) {
+  return (
+    <TabsContext.Provider value={{ value, onValueChange }}>
+      <div className={className}>{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+export function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`inline-flex items-center gap-1 bg-surface-card rounded-[8px] p-1 ${className || ""}`}>
+      {children}
+    </div>
+  );
+}
+
+export function TabsTrigger({ value, children, className }: { value: string; children: React.ReactNode; className?: string }) {
+  const ctx = useTabs();
+  const isActive = ctx.value === value;
+
+  return (
+    <button
+      type="button"
+      className={`px-3.5 py-1.5 rounded-[6px] text-[14px] font-medium transition-colors ${
+        isActive
+          ? "bg-canvas text-ink shadow-sm"
+          : "text-ink-muted hover:text-ink"
+      } ${className || ""}`}
+      onClick={() => ctx.onValueChange(value)}
+    >
+      {children}
+    </button>
+  );
+}

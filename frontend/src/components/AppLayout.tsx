@@ -12,20 +12,12 @@ export function AppLayout() {
   const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData(view, sprintParam);
   const { data: config } = useConfig();
 
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
-  }, []);
-
+  const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
   const handleExport = useCallback(() => {
     const params = new URLSearchParams({ format: "csv", view });
     if (sprintParam) params.set("sprint", sprintParam);
-    const url = `/api/export?${params.toString()}`;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const link = document.createElement("a"); link.href = `/api/export?${params}`; link.download = "";
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }, [view, sprintParam]);
 
   return (
@@ -33,17 +25,9 @@ export function AppLayout() {
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header data={boardData} onExport={handleExport} />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-canvas">
           <div className="px-4 py-3">
-            <Outlet
-              context={{
-                incompleteStates: config?.incomplete_states || [],
-                stateColors: config?.state_colors || {},
-                boardData,
-                boardError,
-                boardErrorDetail,
-              }}
-            />
+            <Outlet context={{ incompleteStates: config?.incomplete_states || [], stateColors: config?.state_colors || {}, boardData, boardError, boardErrorDetail }} />
           </div>
         </main>
       </div>
