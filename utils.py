@@ -166,6 +166,11 @@ def _add_file_handler(logger: logging.Logger, log_path: Path, level: int) -> Non
     logger.addHandler(handler)
 
 
+def filter_items_by_user(items: list[dict], user: str) -> list[dict]:
+    user_lower = user.lower()
+    return [it for it in items if it.get("assignedTo", "").lower() == user_lower]
+
+
 def get_logger(name: str = "sprint_monitor") -> logging.Logger:
     """获取 sprint_monitor 子 logger 实例。
 
@@ -184,5 +189,19 @@ def get_logger(name: str = "sprint_monitor") -> logging.Logger:
     - 文件日志中会显示完整 logger 名称，方便过滤排查
     """
     return logging.getLogger(f"sprint_monitor.{name}")
+
+
+def make_incomplete_set(states: list[str]) -> set[str]:
+    """将状态列表转为小写集合，用于判断是否未完成。"""
+    return {s.lower() for s in states}
+
+
+def sort_by_incomplete(items: list[dict], incomplete_set: set[str]) -> None:
+    """原地排序：未完成项排前面，已完成项排后面，然后按状态、类型排序。"""
+    items.sort(key=lambda it: (
+        0 if (it.get("state", "") or "").lower() in incomplete_set else 1,
+        (it.get("state", "") or "").lower(),
+        (it.get("type", "") or "").lower(),
+    ))
 
 

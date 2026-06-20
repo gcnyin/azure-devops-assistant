@@ -2,6 +2,7 @@
 Azure DevOps REST API 客户端
 """
 import base64
+from datetime import datetime, timezone
 from html import unescape
 import re
 import time
@@ -129,7 +130,6 @@ class AzureDevOpsClient:
             return self.config.PROJECT
 
         # 对每个 Team 查当前 Sprint，找第一个覆盖今天的
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         logger.debug("自动发现 Team: 项目下有 %d 个团队", len(teams))
 
@@ -238,10 +238,9 @@ class AzureDevOpsClient:
 
     def get_current_iteration(self) -> dict[str, str]:
         """获取当前 Sprint (Iteration)，仅返回覆盖今天日期的 Sprint"""
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
 
-        iterations = self.get_all_iterations()
+        iterations = getattr(self, '_all_iterations', None) or self.get_all_iterations()
 
         # 只保留 startDate <= now <= finishDate 的 Sprint
         matching = []
@@ -336,6 +335,10 @@ class AzureDevOpsClient:
                 or fields.get("Custom.Context")
                 or ""
             )
+            acceptance_criteria = fields.get("Microsoft.VSTS.Common.AcceptanceCriteria", "")
+            if acceptance_criteria:
+                ac_text = _strip_html(acceptance_criteria)
+                raw_desc = (raw_desc + "\n\n## Acceptance Criteria\n" + ac_text) if raw_desc else ac_text
             description = _strip_html(raw_desc) if raw_desc else ""
             result.append({
                 "id": item_id,
@@ -344,7 +347,7 @@ class AzureDevOpsClient:
                 "state": fields.get("System.State", "N/A"),
                 "type": fields.get("System.WorkItemType", "N/A"),
                 "assignedTo": assigned_to.get("displayName", "Unassigned") if assigned_to else "Unassigned",
-                "createdDate": fields.get("System.CreatedDate", "N/A"),
+                "createdDate": fields.get("System.CreatedDate", ""),
                 "changedDate": fields.get("System.ChangedDate", ""),
                 "description": description,
                 "htmlUrl": f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/_workitems/edit/{item_id}",
@@ -469,7 +472,7 @@ class AzureDevOpsClient:
                 "GET", url,
                 params={
                     "ids": ids_str,
-                    "fields": "System.Title,System.State,System.WorkItemType,System.AssignedTo,System.CreatedDate,System.ChangedDate,System.Description,Microsoft.VSTS.TCM.ReproSteps,Custom.Context",
+                    "fields": "System.Title,System.State,System.WorkItemType,System.AssignedTo,System.CreatedDate,System.ChangedDate,System.Description,Microsoft.VSTS.TCM.ReproSteps,Custom.Context,Microsoft.VSTS.Common.AcceptanceCriteria",
                     "api-version": "7.1",
                 },
             )

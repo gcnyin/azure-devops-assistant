@@ -13,9 +13,18 @@ import type {
 } from "@/types/api";
 
 const API_BASE = "";
+const TOKEN_KEY = "web_access_token";
+
+function authHeaders(): Record<string, string> | null {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : null;
+}
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const resp = await fetch(`${API_BASE}${url}`);
+  const h = authHeaders();
+  const resp = h
+    ? await fetch(`${API_BASE}${url}`, { headers: h })
+    : await fetch(`${API_BASE}${url}`);
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
   }
@@ -56,7 +65,7 @@ export function useRefreshMutation() {
 
   return useMutation({
     mutationFn: () =>
-      fetch("/api/refresh", { method: "POST" }).then((r) => r.json()),
+      fetch("/api/refresh", { method: "POST", headers: authHeaders() ?? {} }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["board"] });
     },
@@ -71,15 +80,7 @@ export function useFixes(status?: string, bugId?: number) {
   return useQuery<FixItem[]>({
     queryKey: ["fixes", status, bugId],
     queryFn: () =>
-      fetchJson<FixItem[]>(`/api/fixes${qs ? `?${qs}` : ""}`).then((items) =>
-        items.map((item) => ({
-          ...item,
-          repo_results:
-            typeof item.repo_results === "string"
-              ? JSON.parse(item.repo_results)
-              : item.repo_results,
-        }))
-      ),
+      fetchJson<FixItem[]>(`/api/fixes${qs ? `?${qs}` : ""}`),
     refetchInterval: 15_000,
   });
 }
@@ -91,7 +92,7 @@ export function useFixesMutation() {
     mutationFn: (bugIds: number[]) =>
       fetch("/api/fixes/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(authHeaders() ?? {}) },
         body: JSON.stringify({ bug_ids: bugIds }),
       }).then((r) => r.json()),
     onSuccess: () => {
@@ -122,7 +123,7 @@ export function useCancelFixMutation() {
 
   return useMutation({
     mutationFn: (taskId: number) =>
-      fetch(`/api/fixes/${taskId}/cancel`, { method: "POST" }).then((r) => r.json()),
+      fetch(`/api/fixes/${taskId}/cancel`, { method: "POST", headers: authHeaders() ?? {} }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixes"] });
       queryClient.invalidateQueries({ queryKey: ["board"] });
@@ -177,7 +178,7 @@ export function useSaveSettings() {
     mutationFn: (data: SettingsData) =>
       fetch("/api/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(authHeaders() ?? {}) },
         body: JSON.stringify(data),
       }).then((r) => r.json()) as Promise<SaveSettingsResult>,
     onSuccess: () => {

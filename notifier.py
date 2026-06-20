@@ -158,17 +158,14 @@ def notify_changes(
         _send_webhook(config.NOTIFY_WEBHOOK_URL, payload)
 
 
-def notify_fix_result(bug: dict, bug_id: int, success: bool, error: str = "",
-                      agent_name: str = "", pr_results: list | None = None,
-                      config: Config | None = None):
+def notify_fix_result(bug: dict, bug_id: int, success: bool, config,
+                      error: str = "", agent_name: str = "",
+                      pr_results: list | None = None):
     """AI 修复完成或失败时发送桌面通知和 Webhook 通知
 
     success=False 时显示错误信息；success=True 时显示 PR 结果摘要（若 pr_results 为空则仅提示已完成）。
-    复用 _send_desktop 和 _send_webhook，无外部依赖。
+    复用 _send_desktop 和 _send_webhook。
     """
-    if config is None:
-        config = Config()
-
     bug_title = bug.get("title", "N/A")
 
     if success:

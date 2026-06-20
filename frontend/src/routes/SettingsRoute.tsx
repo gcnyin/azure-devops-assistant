@@ -45,7 +45,7 @@ export default function SettingsRoute() {
   const [activeAccordion, setActiveAccordion] = useState<string>("azure");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => { if (settings && !form) setForm({ ...settings }); }, [settings, form]);
+  useEffect(() => { if (settings && !form) { setForm({ ...settings }); localStorage.setItem("web_access_token", settings.web_access_token || ""); } }, [settings, form]);
   if (isLoading) return <div className="flex items-center justify-center py-24 text-ink-muted text-[14px]">Loading settings...</div>;
   if (error || !settings) return <div className="flex items-center justify-center py-24 text-error text-[14px]">Unable to load settings.</div>;
   if (!form) return null;
@@ -79,7 +79,7 @@ export default function SettingsRoute() {
     try {
       const result = await saveMutation.mutateAsync(form);
       if (result.ok) {
-        toast.success("Settings saved"); if (result.config) setForm({ ...result.config });
+        toast.success("Settings saved"); if (result.config) { setForm({ ...result.config }); localStorage.setItem("web_access_token", result.config.web_access_token || ""); }
         const patChanged = editedSensitive.has("azure_devops_pat");
         const azureChanged = SECTIONS.azure.fields.filter(f=>f.restartNote&&f.key!=="azure_devops_pat").some(f=>form[f.key]!==settings[f.key]);
         if (patChanged||azureChanged) toast.warning("Azure DevOps settings changed. Restart required.");

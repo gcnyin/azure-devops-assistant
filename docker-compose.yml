@@ -23,13 +23,13 @@ services:
       - WEB_PORT=9001
       # 是否绑定 0.0.0.0 允许外部访问（容器内必须为 true）
       - BIND_PUBLIC=true
-      # 额外启动参数（如 --ai-fix）
-      # - EXTRA_ARGS=--ai-fix
+      # 额外启动参数（预留扩展）
+      # - EXTRA_ARGS=
 
     volumes:
       # 数据持久化目录（包含 SQLite 数据库），重启不丢失数据
       - ./data:/app/data
       # 日志持久化
       - ./logs:/app/logs
-      # 可选：挂载代码仓库以启用 AI 修复建议（需配合 EXTRA_ARGS=--ai-fix）
+      # 可选：挂载代码仓库以启用 AI 修复建议（AI 修复已常驻可用，通过 Web API 触发）
       # - /path/to/your/code/repo:/workspace:ro

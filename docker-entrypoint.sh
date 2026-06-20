@@ -4,12 +4,9 @@ set -e
 # 默认值
 WEB_PORT="${WEB_PORT:-9001}"
 BIND_PUBLIC="${BIND_PUBLIC:-true}"
-CHECK_INTERVAL="${CHECK_INTERVAL_MINUTES:-30}"
-
 echo "=== Azure DevOps Sprint Monitor (Docker) ==="
 echo "Web 端口: $WEB_PORT"
 echo "公开访问: $BIND_PUBLIC"
-echo "检查间隔: ${CHECK_INTERVAL} 分钟"
 
 # 检查必要的环境变量
 if [ -z "$AZURE_DEVOPS_ORG" ] || [ -z "$AZURE_DEVOPS_PROJECT" ] || [ -z "$AZURE_DEVOPS_PAT" ]; then
@@ -40,7 +37,7 @@ if [ "$BIND_PUBLIC" = "true" ] || [ "$BIND_PUBLIC" = "1" ]; then
     CMD_ARGS="$CMD_ARGS --public"
 fi
 
-# 传递额外的自定义参数（如 --ai-fix）
+# 传递额外的自定义参数（预留扩展）
 if [ -n "$EXTRA_ARGS" ]; then
     CMD_ARGS="$CMD_ARGS $EXTRA_ARGS"
 fi

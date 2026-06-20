@@ -323,6 +323,70 @@ class TestDbCRUD:
         result = self.db.load_snapshot_by_id(99999)
         assert result is None
 
+    def test_get_sprint_stats_basic(self):
+        """基本聚合统计：完成率、状态分布"""
+        items = [
+            _make_item(1, state="Done"),
+            _make_item(2, state="Done"),
+            _make_item(3, state="In Progress"),
+            _make_item(4, state="To Do"),
+            _make_item(5, state="Resolved"),
+        ]
+        self.db.save_snapshot("Sprint A", "TeamX", items)
+        stats = self.db.get_sprint_stats(team_name="TeamX")
+        assert len(stats) == 1
+        s = stats[0]
+        assert s["sprint_name"] == "Sprint A"
+        assert s["total_items"] == 5
+        assert s["completion_rate"] == pytest.approx(0.6)
+        assert s["state_counts"] == {"done": 2, "in progress": 1, "to do": 1, "resolved": 1}
+
+    def test_get_sprint_stats_empty_sprint(self):
+        """空 Sprint 返回 completion_rate=0.0"""
+        self.db.save_snapshot("Sprint Empty", "TeamX", [])
+        stats = self.db.get_sprint_stats(team_name="TeamX")
+        assert len(stats) == 1
+        s = stats[0]
+        assert s["total_items"] == 0
+        assert s["completion_rate"] == 0.0
+        assert s["state_counts"] == {}
+
+    def test_get_sprint_stats_multiple_sprints(self):
+        """多 Sprint 时各 Sprint 独立统计"""
+        self.db.save_snapshot("Sprint 1", "TeamX", [_make_item(1, state="Done")])
+        self.db.save_snapshot("Sprint 1", "TeamX", [_make_item(1, state="Done"), _make_item(2, state="To Do")])
+        self.db.save_snapshot("Sprint 2", "TeamX", [_make_item(3, state="Closed")])
+        stats = self.db.get_sprint_stats(team_name="TeamX")
+        assert len(stats) == 2
+        s1 = [s for s in stats if s["sprint_name"] == "Sprint 1"][0]
+        s2 = [s for s in stats if s["sprint_name"] == "Sprint 2"][0]
+        # Sprint 1: latest snapshot has 2 items (Done, To Do)
+        assert s1["total_items"] == 2
+        assert s1["completion_rate"] == 0.5
+        # Sprint 2: 1 item, Closed
+        assert s2["total_items"] == 1
+        assert s2["completion_rate"] == 1.0
+
+    def test_get_sprint_stats_no_data(self):
+        """无数据时返回空列表"""
+        stats = self.db.get_sprint_stats()
+        assert stats == []
+
+    def test_get_sprint_stats_corrupted_json(self):
+        """损坏的 JSON 数据不导致崩溃，返回 0 items"""
+        import sqlite3
+        conn = self.db._connect()
+        conn.execute(
+            "INSERT INTO sprint_snapshot (sprint_name, team_name, work_items_json) VALUES (?, ?, ?)",
+            ("Sprint Bad", "TeamX", "not valid json{{{-"),
+        )
+        conn.commit()
+        conn.close()
+        stats = self.db.get_sprint_stats(team_name="TeamX")
+        assert len(stats) == 1
+        assert stats[0]["total_items"] == 0
+        assert stats[0]["completion_rate"] == 0.0
+
     def _get_table_names(self):
         conn = self.db._connect()
         tables = conn.execute(

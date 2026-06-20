@@ -161,7 +161,6 @@ export interface SettingsData {
   notify_webhook_url: string;
   notify_pr_webhook_url: string;
   web_access_token: string;
-  log_dir: string;
   ai_provider: string;
 }
 

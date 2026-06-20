@@ -2,6 +2,7 @@
 AI 修复 — 后台线程队列，对 Bug 调用 AI agent 自动修复代码
 并自动创建分支、提交、推送、创建 PR 关联到 Work Item。
 """
+import datetime
 import json
 import os
 import queue
@@ -9,12 +10,11 @@ import re
 import shutil
 import subprocess
 import threading
+from urllib.parse import quote
 
-from config import Config
 from azure_devops import AzureDevOpsClient
 from db import (
-    CANCELLABLE_STATUSES,
-    create_fix_task, get_fix_tasks, update_fix_task_status,
+    create_fix_task, get_fix_tasks, load_all_config, update_fix_task_status,
     STATUS_CANCELLED, STATUS_COMPLETED, STATUS_FAILED,
     STATUS_PENDING, STATUS_RUNNING,
 )
@@ -31,6 +31,9 @@ _work_dir: str = "."
 _timeout_seconds: int = 300
 _target_branch: str = "develop"
 _ai_provider: str = "auto"
+_notify_desktop: bool = False
+_notify_webhook_url: str = ""
+_notify_pr_webhook_url: str = ""
 
 
 def set_work_dir(work_dir: str):
@@ -51,6 +54,24 @@ def set_target_branch(branch: str):
 def set_ai_provider(provider: str):
     global _ai_provider
     _ai_provider = provider.strip().lower() if provider else "auto"
+
+
+def set_notifier_config(desktop: bool, webhook_url: str, pr_webhook_url: str):
+    """Set notification config from web.py runtime settings."""
+    global _notify_desktop, _notify_webhook_url, _notify_pr_webhook_url
+    _notify_desktop = desktop
+    _notify_webhook_url = webhook_url or ""
+    _notify_pr_webhook_url = pr_webhook_url or ""
+
+
+def _make_notify_config():
+    """Build a namespace with notification config for notifier."""
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        NOTIFY_DESKTOP=_notify_desktop,
+        NOTIFY_WEBHOOK_URL=_notify_webhook_url,
+        NOTIFY_PR_WEBHOOK_URL=_notify_pr_webhook_url,
+    )
 
 
 def get_available_agents() -> list[dict[str, str | bool]]:
@@ -217,8 +238,7 @@ def _get_repo_name(repo_path: str) -> str:
 
 def _build_branch_name(bug: dict) -> str:
     """根据 Bug 信息生成分支名: ai-fix/{bug_id}-{YYYYMMDD}-{HHMMSS}"""
-    from datetime import datetime
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     return f"ai-fix/{bug['id']}-{ts}"
 
 
@@ -267,6 +287,7 @@ def _process_one(task_id: int, bug: dict, prompt: str):
 
     bug_id = bug["id"]
     branch_name = _build_branch_name(bug)
+    notify_config = _make_notify_config()
 
     # ── 步骤 1: 扫描仓库 ──
     repos = _scan_repos(_work_dir)
@@ -277,7 +298,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
             finished_at="now",
         )
         notify_fix_result(bug, bug_id, success=False,
-                          error=f"WORK_DIR 下未找到任何 Git 仓库: {_work_dir}")
+                          error=f"WORK_DIR 下未找到任何 Git 仓库: {_work_dir}",
+                          config=notify_config)
         return
 
     # ── 步骤 2: 准备所有仓库用于分析 (stash → checkout develop → pull) ──
@@ -310,7 +332,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
                 finished_at="now",
             )
             notify_fix_result(bug, bug_id, success=False,
-                              error=f"准备仓库 [{repo_name}] 失败: {e}")
+                              error=f"准备仓库 [{repo_name}] 失败: {e}",
+                              config=notify_config)
             prep_failed = True
             break
 
@@ -331,7 +354,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         notify_fix_result(bug, bug_id, success=False,
                           error=analysis_error or "分析阶段无可用的 AI agent",
-                          agent_name=analysis_agent or "")
+                          agent_name=analysis_agent or "",
+                          config=notify_config)
         logger.warning("任务 #%d 分析阶段失败: %s", task_id, analysis_error)
         return
 
@@ -347,7 +371,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         notify_fix_result(bug, bug_id, success=False,
                           error="AI 分析未能定位到目标仓库",
-                          agent_name=analysis_agent or "")
+                          agent_name=analysis_agent or "",
+                          config=notify_config)
         logger.warning("任务 #%d 分析结果为空", task_id)
         return
 
@@ -383,7 +408,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         notify_fix_result(bug, bug_id, success=False,
                           error="目标仓库验证失败，无法创建 fix 分支",
-                          agent_name=analysis_agent or "")
+                          agent_name=analysis_agent or "",
+                          config=notify_config)
         return
 
     # ── 步骤 5: 阶段 2 — AI 修复代码 ──
@@ -455,7 +481,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         )
         notify_fix_result(bug, bug_id, success=True,
                           agent_name=final_agent or "",
-                          pr_results=pr_results if pr_results else None)
+                          pr_results=pr_results if pr_results else None,
+                          config=notify_config)
         logger.info("任务 #%d 完成: agent=%s, 响应 %d 字符, PR %d 个",
                     task_id, final_agent, len(combined_response),
                     sum(1 for r in pr_results if r.get("pr_url")))
@@ -471,7 +498,8 @@ def _process_one(task_id: int, bug: dict, prompt: str):
         notify_fix_result(bug, bug_id, success=False,
                           error=agent_error or "修复阶段无可用的 AI agent",
                           agent_name=final_agent or "",
-                          pr_results=pr_results if pr_results else None)
+                          pr_results=pr_results if pr_results else None,
+                          config=notify_config)
         logger.warning("任务 #%d 修复阶段失败: %s", task_id, agent_error)
 
 
@@ -736,6 +764,14 @@ def enqueue_fix_tasks(bugs: list[dict], sprint_name: str = "") -> list[int]:
     return task_ids
 
 
+def _make_bug_url(bug_id: int) -> str:
+    """Construct Azure DevOps work item URL from DB config and bug id."""
+    cfg = load_all_config()
+    org = cfg["azure_devops_org"]
+    project = quote(cfg["azure_devops_project"], safe='')
+    return f"https://dev.azure.com/{org}/{project}/_workitems/edit/{bug_id}"
+
+
 def recover_pending_tasks():
     """服务器重启后恢复 orphaned 修复任务。
 
@@ -752,7 +788,7 @@ def recover_pending_tasks():
                 "title": task["bug_title"],
                 "type": task.get("work_item_type", "Bug"),
                 "description": "",
-                "htmlUrl": "",
+                "htmlUrl": _make_bug_url(task["bug_id"]),
             }
             _task_queue.put((task["id"], bug, task["prompt"] or ""))
         logger.info("%d 个 pending 任务已重新入队", len(pending_tasks))

@@ -12,17 +12,11 @@ Azure DevOps Sprint 看板监控配置
 import os
 from dotenv import load_dotenv
 
-_dotenv_loaded = False
-
-
 class Config:
     """可实例化的配置类，支持通过 __init__ 传入值或从环境变量读取"""
 
     def __init__(self, **kwargs):
-        global _dotenv_loaded
-        if not _dotenv_loaded:
-            load_dotenv()
-            _dotenv_loaded = True
+        load_dotenv()
 
         self.ORG: str = kwargs.get("ORG") or os.getenv("AZURE_DEVOPS_ORG", "")
         self.PROJECT: str = kwargs.get("PROJECT") or os.getenv("AZURE_DEVOPS_PROJECT", "")
@@ -82,6 +76,11 @@ class Config:
         # 留空则不启用认证
         self.WEB_ACCESS_TOKEN: str = (
             kwargs.get("WEB_ACCESS_TOKEN") or os.getenv("WEB_ACCESS_TOKEN", "")
+        )
+
+        # ── AI Provider ──
+        self.AI_PROVIDER: str = (
+            kwargs.get("AI_PROVIDER") or os.getenv("AZURE_DEVOPS_AI_PROVIDER", "auto")
         )
 
         # ── 日志目录 ──

@@ -21,7 +21,7 @@ from db import init_db, load_previous_items, save_snapshot, diff_items, load_sna
     init_config_from_env, load_all_config
 from notifier import notify_changes
 from web import update_cached_data, run_web_server
-from utils import setup_logging, get_logger
+from utils import setup_logging, get_logger, make_incomplete_set, sort_by_incomplete
 
 # ── 全局配置实例 ──
 config = Config()
@@ -50,15 +50,10 @@ def fetch_data(
     client: AzureDevOpsClient,
     assigned_to: str | None = None,
     with_diff: bool = True,
-    filter_by_user: bool = True,
 ) -> tuple[dict, list[dict], dict | None]:
-    """获取 Sprint 数据，个人模式下只保存本人卡片，全量模式下保存全部
-
-    filter_by_user: 为 True 且 assigned_to 非空时，仅返回当前用户的卡片；
-                    为 False 时返回全部卡片（全量视图）。
-    """
+    """获取 Sprint 数据，全量模式下保存全部卡片"""
     iteration = client.get_current_iteration()
-    incomplete_set = {s.lower() for s in config.QUERY_STATES}
+    incomplete_set = make_incomplete_set(config.QUERY_STATES)
 
     # 始终拉取全量 Work Items（不受状态/负责人限制），用于快照
     all_items = client.query_work_items(iteration_path=iteration["path"], states=None)
@@ -67,22 +62,12 @@ def fetch_data(
 
     # 展示层过滤
     # 返回所有 Work Items（含已完成），以便终端/导出/Web 正确统计完成数
-    if assigned_to and filter_by_user:
-        user_lower = assigned_to.lower()
-        items = [it for it in all_items if it.get("assignedTo", "").lower() == user_lower]
-    else:
-        items = list(all_items)
+    items = list(all_items)
     # 统一排序：未完成的排前面，已完成的排后面
-    items.sort(key=lambda it: (
-        0 if it["state"].lower() in incomplete_set else 1,
-        it["state"], it["type"],
-    ))
+    sort_by_incomplete(items, incomplete_set)
 
-    # 快照数据：个人模式下只保存本人的卡片；全量模式下保存全部
-    snapshot_items = (
-        [it for it in all_items if it.get("assignedTo", "").lower() == assigned_to.lower()]
-        if (assigned_to and filter_by_user) else all_items
-    )
+    # 快照数据：全量模式，保存全部卡片
+    snapshot_items = all_items
 
     # 增量对比：基于快照数据做 diff
     diff_info = None
@@ -90,10 +75,9 @@ def fetch_data(
         prev_items, prev_time = load_previous_items(iteration["name"], client.team_name)
         if prev_items:
             new_items, cont_items, gone_items = diff_items(snapshot_items, prev_items)
-            if not assigned_to:
-                new_items = [it for it in new_items if it["state"].lower() in incomplete_set]
-                cont_items = [it for it in cont_items if it.get("_state_changed") or it["state"].lower() in incomplete_set]
-                gone_items = [it for it in gone_items if it.get("state", "").lower() in incomplete_set]
+            new_items = [it for it in new_items if it["state"].lower() in incomplete_set]
+            cont_items = [it for it in cont_items if it.get("_state_changed") or it["state"].lower() in incomplete_set]
+            gone_items = [it for it in gone_items if it.get("state", "").lower() in incomplete_set]
             diff_info = {
                 "prev_time": prev_time,
                 "new_items": new_items,
@@ -112,7 +96,6 @@ def load_offline_data(
     sprint_name: str = "",
     team_name: str = "",
     assigned_to: str | None = None,
-    filter_by_user: bool = True,
 ) -> tuple[dict, list[dict], dict | None] | None:
     """离线模式：从数据库加载最后一次快照
 
@@ -145,18 +128,11 @@ def load_offline_data(
     }
 
     snapshot_list = list(prev_items.values())
-    incomplete_set = {s.lower() for s in config.QUERY_STATES}
+    incomplete_set = make_incomplete_set(config.QUERY_STATES)
 
     # 返回所有 Work Items（含已完成），以保持一致统计口径
-    if assigned_to and filter_by_user:
-        user_lower = assigned_to.lower()
-        items = [it for it in snapshot_list if it.get("assignedTo", "").lower() == user_lower]
-    else:
-        items = list(snapshot_list)
-    items.sort(key=lambda it: (
-        0 if it["state"].lower() in incomplete_set else 1,
-        it["state"], it["type"],
-    ))
+    items = list(snapshot_list)
+    sort_by_incomplete(items, incomplete_set)
 
     diff_info = {
         "prev_time": prev_time,
@@ -173,14 +149,12 @@ def check_once(
     client: AzureDevOpsClient,
     assigned_to: str | None = None,
     with_diff: bool = True,
-    filter_by_user: bool = True,
 ) -> tuple | None:
     """执行一次检查，返回 (iteration, items, diff_info, offline) 或 None（出错时）"""
     offline = False
     try:
         iteration, items, diff_info = fetch_data(
             client, assigned_to=assigned_to, with_diff=with_diff,
-            filter_by_user=filter_by_user,
         )
         # 保存当前 Sprint 名称，供下次 API 失败时离线回退使用
         client._last_sprint_name = iteration["name"]
@@ -191,7 +165,7 @@ def check_once(
         logger.warning("尝试从本地数据库加载上次快照...")
         try:
             sprint_name = getattr(client, '_last_sprint_name', '')
-            offline_result = load_offline_data(sprint_name, client.team_name, assigned_to, filter_by_user=filter_by_user)
+            offline_result = load_offline_data(sprint_name, client.team_name, assigned_to)
             if offline_result:
                 iteration, items, diff_info = offline_result
                 offline = True
@@ -285,15 +259,20 @@ def main():
 
     def check_and_cache():
         try:
+            # 每次拉取前从 DB 重新加载运行时配置，确保 Web UI 变更即时生效
+            db_config = load_all_config(for_api=False)
+            apply_runtime_config(db_config, config)
+
             # 拉取该团队所有迭代列表（供前端 sprint 下拉使用）
             try:
                 all_iters = client.get_all_iterations()
+                client._all_iterations = all_iters  # 避免 get_current_iteration 再次调用
                 from web import update_cached_iterations
                 update_cached_iterations(all_iters)
             except Exception as e:
                 logger.warning("获取迭代列表失败，sprint 下拉可能不完整: %s", e)
 
-            result = check_once(client, assigned_to=assigned_to, filter_by_user=False)
+            result = check_once(client, assigned_to=assigned_to)
         except Exception as e:
             logger.error("check_once 发生未预期异常: %s", e, exc_info=True)
             try:
@@ -330,6 +309,10 @@ def main():
             except Exception:
                 pass
 
+    # 设置 Web 配置（优先从 DB 读取）
+    from web import set_refresh_callback, set_azure_devops_client
+    from web import _apply_runtime_config as apply_runtime_config
+
     # 首次执行
     check_and_cache()
 
@@ -337,19 +320,11 @@ def main():
     schedule.every(interval).minutes.do(check_and_cache)
 
     # ── Web UI ──
-
-    # 设置 Web 配置（优先从 DB 读取）
-    from web import set_web_query_states, set_web_work_dir, set_web_access_token, set_refresh_callback, set_azure_devops_client
-    from web import _apply_runtime_config as apply_runtime_config
-    from ai_fix import set_timeout as ai_set_timeout, set_target_branch as ai_set_target_branch, recover_pending_tasks
-
-    # 应用 DB 配置到运行时
-    apply_runtime_config(db_config)
+    from ai_fix import recover_pending_tasks
 
     # 恢复上次重启前遗留的修复任务
     recover_pending_tasks()
 
-    # 以下 setter 在 _apply_runtime_config 中已调用，此处作为兜底
     set_refresh_callback(check_and_cache)
     set_azure_devops_client(client)
 

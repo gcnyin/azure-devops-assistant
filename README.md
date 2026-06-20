@@ -32,7 +32,6 @@ azure_devops.py    Azure DevOps REST API 客户端
 config.py          配置管理（.env 加载）
 db.py              SQLite 持久化
 ai_fix.py          AI 修复建议
-renderer.py        状态颜色常量
 notifier.py        通知模块
 web.py             Flask API 服务器
 frontend/          React SPA 前端
@@ -110,8 +109,7 @@ python main.py -w 3000
 # 允许外部访问
 python main.py --public
 
-# 启用 AI 修复建议
-python main.py --ai-fix
+# AI 修复建议已常驻可用，通过 Web API 触发（无需命令行参数）
 ```
 
 ## 前端开发

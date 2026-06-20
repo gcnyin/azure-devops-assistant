@@ -674,19 +674,6 @@ class TestNotifyFixResult:
         mock_desktop.assert_not_called()
         mock_webhook.assert_not_called()
 
-    def test_default_config_when_none(self, mocker):
-        """未传 config 时使用默认 Config 不崩溃"""
-        mock_desktop = mocker.patch("notifier._send_desktop")
-
-        from notifier import notify_fix_result
-
-        notify_fix_result(
-            {"title": "默认配置"}, 5,
-            success=True,
-        )
-
-        mock_desktop.assert_not_called()  # 环境变量未设置 NOTIFY_DESKTOP
-
     def test_pr_webhook_url_takes_precedence(self, mocker):
         """NOTIFY_PR_WEBHOOK_URL 优先于 NOTIFY_WEBHOOK_URL"""
         mock_webhook = mocker.patch("notifier._send_webhook")

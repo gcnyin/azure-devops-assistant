@@ -55,7 +55,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const columns = useMemo(() => {
     const grouped: Record<string, WorkItem[]> = {};
-    const doneStates = new Set(["done", "closed", "completed", "resolved", "removed"]);
+    const doneStates = new Set(["done", "closed", "completed", "resolved"]);
 
     for (const item of items) {
       const key = item.state || "Unknown";

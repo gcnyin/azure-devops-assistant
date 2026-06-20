@@ -63,7 +63,7 @@ def init_db():
         conn.execute("PRAGMA journal_mode=WAL")
         # 清理已删除的配置项历史数据
         conn.execute(
-            "DELETE FROM app_config WHERE key IN ('ai_model', 'ai_api_base_url', 'ai_api_key')"
+            "DELETE FROM app_config WHERE key IN ('ai_model', 'ai_api_base_url', 'ai_api_key', 'log_dir')"
         )
         conn.commit()
     logger.debug("数据库表结构检查完成")
@@ -212,7 +212,8 @@ def update_fix_task_status(task_id: int, status: str, **kwargs):
     logger.debug("任务 #%d 状态更新: %s", task_id, status)
 
 
-def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = None) -> list[dict]:
+def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = None,
+                   sprint_name: str | None = None) -> list[dict]:
     """查询修复任务。status 可传单个字符串或列表，None 表示所有状态。"""
     try:
         with _connect() as conn:
@@ -229,10 +230,14 @@ def get_fix_tasks(status: str | list[str] | None = None, bug_id: int | None = No
             if bug_id is not None:
                 query += " AND bug_id = ?"
                 params.append(bug_id)
+            if sprint_name is not None:
+                query += " AND sprint_name = ?"
+                params.append(sprint_name)
             query += " ORDER BY created_at DESC"
             rows = conn.execute(query, params).fetchall()
             return [dict(r) for r in rows]
     except Exception:
+        logger.warning("查询修复任务失败", exc_info=True)
         return []
 
 
@@ -247,6 +252,7 @@ def get_fix_task_by_id(task_id: int) -> dict | None:
                 return None
             return dict(row)
     except Exception:
+        logger.warning("按 ID 查询修复任务失败: task_id=%s", task_id, exc_info=True)
         return None
 
 
@@ -271,6 +277,91 @@ def cancel_fix_task(task_id: int) -> bool:
     return True
 
 
+# ── Sprint stats ──
+
+COMPLETED_STATES: set[str] = {"done", "closed", "completed", "resolved"}
+
+
+def get_sprint_stats(team_name: str | None = None) -> list[dict]:
+    """Return aggregated stats per sprint from the latest snapshot of each sprint.
+
+    Returns a list of dicts: sprint_name, team_name, fetched_at, total_items,
+    completion_rate (0.0-1.0), state_counts (dict), first_fetched_at, last_fetched_at.
+    """
+    with _connect() as conn:
+        # Subquery: latest snapshot id per (sprint_name, team_name)
+        base = """
+            SELECT sprint_name, team_name, work_items_json, fetched_at
+            FROM sprint_snapshot
+            WHERE id IN (
+                SELECT MAX(id) FROM sprint_snapshot
+                GROUP BY sprint_name, COALESCE(team_name, '')
+            )
+        """
+        params: list = []
+        if team_name:
+            base += " AND team_name = ?"
+            params.append(team_name)
+        base += " ORDER BY sprint_name"
+        rows = conn.execute(base, params).fetchall()
+
+        # Per-sprint date range: first/last fetched_at across all snapshots
+        dr_query = """
+            SELECT sprint_name, team_name,
+                   MIN(fetched_at) as first_fetched_at,
+                   MAX(fetched_at) as last_fetched_at
+            FROM sprint_snapshot
+        """
+        dr_params: list = []
+        if team_name:
+            dr_query += " WHERE team_name = ?"
+            dr_params.append(team_name)
+        dr_query += " GROUP BY sprint_name, team_name"
+        dr_rows = conn.execute(dr_query, dr_params).fetchall()
+        date_range: dict[tuple, dict] = {
+            (r["sprint_name"], r["team_name"]): {
+                "first_fetched_at": r["first_fetched_at"],
+                "last_fetched_at": r["last_fetched_at"],
+            }
+            for r in dr_rows
+        }
+
+    result = []
+    for row in rows:
+        try:
+            items = json.loads(row["work_items_json"])
+        except (json.JSONDecodeError, TypeError):
+            items = []
+        if not isinstance(items, list):
+            items = []
+
+        total = len(items)
+        state_counts: dict[str, int] = {}
+        completed_count = 0
+        for it in items:
+            state = (it.get("state") or "").strip().lower()
+            if not state:
+                state = "unknown"
+            state_counts[state] = state_counts.get(state, 0) + 1
+            if state in COMPLETED_STATES:
+                completed_count += 1
+
+        completion_rate = completed_count / total if total > 0 else 0.0
+
+        dr = date_range.get((row["sprint_name"], row["team_name"]), {})
+        result.append({
+            "sprint_name": row["sprint_name"],
+            "team_name": row["team_name"],
+            "fetched_at": row["fetched_at"],
+            "total_items": total,
+            "completion_rate": round(completion_rate, 4),
+            "state_counts": state_counts,
+            "first_fetched_at": dr.get("first_fetched_at"),
+            "last_fetched_at": dr.get("last_fetched_at"),
+        })
+    return result
+
+
 def get_bug_fix_status_map() -> dict[int, dict]:
     """返回 {bug_id: {status, task_id, created_at, started_at}}，取每个 bug 最新任务的信息"""
     try:
@@ -289,6 +380,7 @@ def get_bug_fix_status_map() -> dict[int, dict]:
                 for r in rows
             }
     except Exception:
+        logger.warning("查询 Bug 修复状态映射失败", exc_info=True)
         return {}
 
 
@@ -415,7 +507,6 @@ _CONFIG_META: dict[str, tuple[str, bool]] = {
     "notify_webhook_url": ("", False),
     "notify_pr_webhook_url": ("", False),
     "web_access_token": ("", True),
-    "log_dir": ("", False),
     "ai_provider": ("auto", False),
 }
 
@@ -452,7 +543,7 @@ def init_config_from_env(config_obj) -> bool:
         "notify_webhook_url": config_obj.NOTIFY_WEBHOOK_URL,
         "notify_pr_webhook_url": config_obj.NOTIFY_PR_WEBHOOK_URL,
         "web_access_token": config_obj.WEB_ACCESS_TOKEN,
-        "log_dir": config_obj.LOG_DIR,
+        "ai_provider": config_obj.AI_PROVIDER,
     }
 
     with _connect() as conn:

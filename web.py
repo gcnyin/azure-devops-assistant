@@ -6,6 +6,7 @@ import copy
 import csv
 import io
 import os
+import sys
 import threading
 import warnings
 from datetime import datetime
@@ -14,15 +15,16 @@ from typing import Any
 from flask import Flask, jsonify, request, Response, send_file
 
 from db import (
-    list_snapshots, load_snapshot_by_id, load_previous_items, diff_items,
+    list_snapshots, load_snapshot_by_id, diff_items,
     get_fix_tasks, get_bug_fix_status_map, get_fix_task_by_id,
     cancel_fix_task, ALL_STATUSES, RETRYABLE_STATUSES,
     list_sprint_summaries, load_latest_snapshot_by_sprint,
     save_snapshot,
     load_all_config, save_config,
+    get_sprint_stats,
 )
 from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, get_available_agents
-from utils import get_logger
+from utils import get_logger, filter_items_by_user, make_incomplete_set, sort_by_incomplete
 
 logger = get_logger(__name__)
 
@@ -32,16 +34,11 @@ def _sort_items(items: list[dict], sort_key: str, incomplete_states: list[str]) 
 
     sort_key format: "{field}-{direction}" or "default" (empty/None treated as default).
     """
-    import copy
     result = list(items)
 
     if not sort_key or sort_key == "default":
-        incomplete_set = {s.lower() for s in incomplete_states}
-        result.sort(key=lambda it: (
-            0 if (it.get("state", "") or "").lower() in incomplete_set else 1,
-            (it.get("state", "") or "").lower(),
-            (it.get("type", "") or "").lower(),
-        ))
+        incomplete_set = make_incomplete_set(incomplete_states)
+        sort_by_incomplete(result, incomplete_set)
         return result
 
     parts = sort_key.rsplit("-", 1)
@@ -50,7 +47,7 @@ def _sort_items(items: list[dict], sort_key: str, incomplete_states: list[str]) 
     reverse = direction == "desc"
 
     key_map: dict[str, Any] = {
-        "id": lambda it: it.get("id", 0) or 0,
+        "id": lambda it: it.get("id") or (sys.maxsize if not reverse else -1),
         "title": lambda it: (it.get("title", "") or "").lower(),
         "type": lambda it: (it.get("type", "") or "").lower(),
         "state": lambda it: (it.get("state", "") or "").lower(),
@@ -111,17 +108,6 @@ _access_token: str = ""
 
 # ── Manual refresh callback (set by main.py at startup) ──
 _refresh_callback = None
-
-
-def set_web_work_dir(work_dir: str):
-    global _work_dir
-    _work_dir = work_dir or "."
-    ai_set_work_dir(_work_dir)
-
-
-def set_web_query_states(states: list[str]):
-    global _expected_query_states
-    _expected_query_states = list(states)
 
 
 def set_web_access_token(token: str):
@@ -200,14 +186,15 @@ def _check_access_token():
 
 # ── Runtime config setters ──
 
-def _apply_runtime_config(data: dict[str, str]):
-    """将配置值应用到运行时全局变量和 setter 函数"""
+def _apply_runtime_config(data: dict[str, str], config=None):
+    """将配置值应用到运行时全局变量和 setter 函数，若传入 config 则同步通知/查询状态属性"""
     global _expected_query_states, _work_dir, _access_token
     from ai_fix import (
         set_timeout as ai_set_timeout,
         set_target_branch as ai_set_target_branch,
         set_work_dir as ai_set_work_dir,
         set_ai_provider,
+        set_notifier_config,
     )
 
     # 查询状态
@@ -237,6 +224,21 @@ def _apply_runtime_config(data: dict[str, str]):
 
     # Web 认证
     _access_token = data.get("web_access_token", "").strip()
+
+    # 通知配置
+    nd = data.get("notify_desktop", "").strip()
+    notify_desktop = nd.lower() in ("true", "1", "yes")
+    notify_webhook_url = data.get("notify_webhook_url", "").strip()
+    notify_pr_webhook_url = data.get("notify_pr_webhook_url", "").strip() or notify_webhook_url
+    set_notifier_config(notify_desktop, notify_webhook_url, notify_pr_webhook_url)
+
+    # 同步到 config 对象（供 notify_changes 使用）
+    if config is not None:
+        config.NOTIFY_DESKTOP = notify_desktop
+        config.NOTIFY_WEBHOOK_URL = notify_webhook_url
+        config.NOTIFY_PR_WEBHOOK_URL = notify_pr_webhook_url
+        if states_str:
+            config.QUERY_STATES = list(_expected_query_states)
 
 
 # ── API Routes ──
@@ -273,6 +275,19 @@ def api_config():
         "incomplete_states": _expected_query_states,
         "state_colors": STATE_COLORS_HEX,
     })
+
+
+@app.route("/api/sprints/stats")
+def api_sprints_stats():
+    """返回每个 Sprint 的聚合统计：完成率、状态分布、条目数、日期范围。"""
+    try:
+        current_data = get_cached_data()
+        team_name = current_data.get("team_name", "") or None
+        stats = get_sprint_stats(team_name=team_name)
+        return jsonify({"sprints": stats})
+    except Exception as e:
+        logger.error("Failed to load sprint stats: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/sprints")
@@ -451,16 +466,12 @@ def api_data():
     diff_info = data["diff_info"]
 
     if view_mode == "me" and data["assigned_to"]:
-        user_lower = data["assigned_to"].lower()
-        items = [it for it in items if it.get("assignedTo", "").lower() == user_lower]
+        items = filter_items_by_user(items, data["assigned_to"])
         if diff_info:
-            def _filter_by_user(item_list: list[dict]) -> list[dict]:
-                return [it for it in (item_list or [])
-                        if it.get("assignedTo", "").lower() == user_lower]
             filtered_diff = dict(diff_info)
-            filtered_diff["new_items"] = _filter_by_user(diff_info.get("new_items", []))
-            filtered_diff["continuing_items"] = _filter_by_user(diff_info.get("continuing_items", []))
-            filtered_diff["gone_items"] = _filter_by_user(diff_info.get("gone_items", []))
+            filtered_diff["new_items"] = filter_items_by_user(diff_info.get("new_items", []), data["assigned_to"])
+            filtered_diff["continuing_items"] = filter_items_by_user(diff_info.get("continuing_items", []), data["assigned_to"])
+            filtered_diff["gone_items"] = filter_items_by_user(diff_info.get("gone_items", []), data["assigned_to"])
             diff_info = filtered_diff
 
     # 附加每个 Bug 的修复状态
@@ -497,6 +508,7 @@ def api_data():
 def api_fixes():
     status_str = request.args.get("status", "")
     bug_id_str = request.args.get("bug_id", "")
+    sprint_name = request.args.get("sprint", "") or None
 
     status = None
     if status_str:
@@ -513,7 +525,7 @@ def api_fixes():
         except ValueError:
             return jsonify({"error": "bug_id must be an integer"}), 400
 
-    tasks = get_fix_tasks(status=status, bug_id=bug_id)
+    tasks = get_fix_tasks(status=status, bug_id=bug_id, sprint_name=sprint_name)
     # Strip heavy fields from list response to keep payloads small
     for t in tasks:
         t.pop("response", None)
@@ -641,10 +653,9 @@ def api_export():
     if view_mode == "me":
         assigned_to = data.get("assigned_to", "")
         if assigned_to:
-            user_lower = assigned_to.lower()
-            items = [it for it in items if it.get("assignedTo", "").lower() == user_lower]
+            items = filter_items_by_user(items, assigned_to)
 
-    columns = ["id", "title", "state", "type", "assignedTo", "description"]
+    columns = ["id", "title", "state", "type", "assignedTo", "description", "htmlUrl", "changedDate", "createdDate"]
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_ALL)
     writer.writerow(columns)
@@ -766,7 +777,7 @@ def serve_spa(path: str):
     # If path points to an actual file, serve it
     if path:
         file_path = os.path.join(static_dir, path)
-        if os.path.isfile(file_path):
+        if os.path.isfile(file_path) and os.path.realpath(file_path).startswith(os.path.realpath(static_dir) + os.sep):
             return send_file(file_path)
     # Otherwise serve index.html for client-side routing
     return send_file(os.path.join(static_dir, "index.html"))
@@ -826,3 +837,15 @@ if __name__ == "__main__":
     r = _get_sprint_data("nonexistent-sprint-xyz")
     assert r is None, f"nonexistent sprint: {r}"
     print("web.py _get_sprint_data: OK")
+
+    # _sort_items: missing-ID items sort last in both asc and desc
+    items = [
+        {"id": 3}, {"title": "no-id-A"}, {"id": 1}, {"title": "no-id-B"}, {"id": 2},
+    ]
+    sorted_asc = _sort_items(items, "id-asc", [])
+    ids_asc = [it.get("id") for it in sorted_asc]
+    assert ids_asc == [1, 2, 3, None, None], f"asc: {ids_asc}"
+    sorted_desc = _sort_items(items, "id-desc", [])
+    ids_desc = [it.get("id") for it in sorted_desc]
+    assert ids_desc == [3, 2, 1, None, None], f"desc: {ids_desc}"
+    print("web.py _sort_items id: OK")

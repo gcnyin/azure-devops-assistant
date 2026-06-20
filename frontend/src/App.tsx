@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router";
 import { Toaster } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { BoardRoute } from "@/routes/BoardRoute";
-import FixesRoute from "@/routes/FixesRoute";
+import { FixesView } from "@/components/FixesView";
 import SettingsRoute from "@/routes/SettingsRoute";
 import { HistoryView } from "@/components/HistoryView";
 import { DiffView } from "@/components/DiffView";
@@ -23,7 +23,7 @@ export default function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<BoardRoute />} />
-          <Route path="fixes" element={<FixesRoute />} />
+          <Route path="fixes" element={<FixesView />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="diff/:idA/:idB" element={<DiffView />} />
           <Route path="settings" element={<SettingsRoute />} />

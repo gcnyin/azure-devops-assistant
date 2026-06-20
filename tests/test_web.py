@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from web import app, update_cached_data, get_cached_data, set_web_query_states, set_web_access_token, set_refresh_callback
+from web import app, update_cached_data, get_cached_data, set_web_access_token, set_refresh_callback, _sort_items
 
 
 @pytest.fixture
@@ -1048,3 +1048,249 @@ class TestApiDataWithSprintParam:
         assert "offline" in data
         assert "error" in data
         assert "view_mode" in data
+
+
+class TestSortItems:
+    """_sort_items 排序函数单元测试"""
+
+    INCOMPLETE = ["to do", "in progress", "active", "new", "committed"]
+
+    def test_default_sort_incomplete_first(self):
+        """默认排序：不完整状态在最前，然后按 state、type 排序"""
+        items = [
+            {"id": 1, "title": "a", "state": "Closed", "type": "Bug"},
+            {"id": 2, "title": "b", "state": "To Do", "type": "Task"},
+            {"id": 3, "title": "c", "state": "In Progress", "type": "Bug"},
+            {"id": 4, "title": "d", "state": "Done", "type": "Task"},
+            {"id": 5, "title": "e", "state": "Active", "type": "Bug"},
+        ]
+        result = _sort_items(items, "default", self.INCOMPLETE)
+        states = [it["state"] for it in result]
+        incomplete_set = self.INCOMPLETE
+        # 不完整状态在前
+        assert states[0].lower() in incomplete_set
+        assert states[1].lower() in incomplete_set
+        assert states[2].lower() in incomplete_set
+        assert states[3].lower() not in incomplete_set
+        assert states[4].lower() not in incomplete_set
+        # 组内按 state 字母序
+        incomplete = [it for it in result if it["state"].lower() in incomplete_set]
+        assert [it["state"] for it in incomplete] == ["Active", "In Progress", "To Do"]
+
+    def test_default_sort_empty_incomplete_states(self):
+        """incomplete_states 为空时，所有项都是 'complete'，按 state/type 排序"""
+        items = [
+            {"id": 1, "title": "z", "state": "In Progress", "type": "Bug"},
+            {"id": 2, "title": "a", "state": "To Do", "type": "Task"},
+        ]
+        result = _sort_items(items, "default", [])
+        states = [it["state"] for it in result]
+        assert states == ["In Progress", "To Do"]
+
+    def test_default_sort_empty_input(self):
+        """空列表不崩溃"""
+        result = _sort_items([], "default", self.INCOMPLETE)
+        assert result == []
+
+    def test_default_sort_null_none_sort_key(self):
+        """sort_key 为 None 或空字符串视为 default"""
+        items = [
+            {"id": 2, "title": "b", "state": "To Do", "type": "Bug"},
+            {"id": 1, "title": "a", "state": "Done", "type": "Task"},
+        ]
+        result_none = _sort_items(items, None, self.INCOMPLETE)
+        result_empty = _sort_items(items, "", self.INCOMPLETE)
+        assert result_none == result_empty
+        # To Do 在前
+        assert result_none[0]["state"] == "To Do"
+
+    def test_sort_id_asc(self):
+        """按 id 升序"""
+        items = [
+            {"id": 3, "title": "c"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        result = _sort_items(items, "id-asc", [])
+        assert [it["id"] for it in result] == [1, 2, 3]
+
+    def test_sort_id_desc(self):
+        """按 id 降序"""
+        items = [
+            {"id": 3, "title": "c"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        result = _sort_items(items, "id-desc", [])
+        assert [it["id"] for it in result] == [3, 2, 1]
+
+    def test_sort_title_asc(self):
+        """按 title 升序（不区分大小写）"""
+        items = [
+            {"id": 3, "title": "Banana"},
+            {"id": 1, "title": "apple"},
+            {"id": 2, "title": "Cherry"},
+        ]
+        result = _sort_items(items, "title-asc", [])
+        titles = [it["title"] for it in result]
+        assert titles == ["apple", "Banana", "Cherry"]
+
+    def test_sort_title_desc(self):
+        """按 title 降序"""
+        items = [
+            {"id": 1, "title": "apple"},
+            {"id": 2, "title": "banana"},
+            {"id": 3, "title": "cherry"},
+        ]
+        result = _sort_items(items, "title-desc", [])
+        assert [it["title"] for it in result] == ["cherry", "banana", "apple"]
+
+    def test_sort_state_asc(self):
+        """按 state 升序"""
+        items = [
+            {"id": 1, "state": "Done"},
+            {"id": 2, "state": "Active"},
+            {"id": 3, "state": "To Do"},
+        ]
+        result = _sort_items(items, "state-asc", [])
+        assert [it["state"] for it in result] == ["Active", "Done", "To Do"]
+
+    def test_sort_type_desc(self):
+        """按 type 降序"""
+        items = [
+            {"id": 1, "type": "Bug"},
+            {"id": 2, "type": "Task"},
+            {"id": 3, "type": "User Story"},
+        ]
+        result = _sort_items(items, "type-desc", [])
+        assert [it["type"] for it in result] == ["User Story", "Task", "Bug"]
+
+    def test_sort_assignee_asc(self):
+        """按 assignee 升序"""
+        items = [
+            {"id": 1, "assignedTo": "Carl"},
+            {"id": 2, "assignedTo": "Alice"},
+            {"id": 3, "assignedTo": "Bob"},
+        ]
+        result = _sort_items(items, "assignee-asc", [])
+        assert [it["assignedTo"] for it in result] == ["Alice", "Bob", "Carl"]
+
+    def test_sort_created_desc(self):
+        """按 created 降序"""
+        items = [
+            {"id": 1, "createdDate": "2025-01-01"},
+            {"id": 2, "createdDate": "2025-06-15"},
+            {"id": 3, "createdDate": "2025-03-10"},
+        ]
+        result = _sort_items(items, "created-desc", [])
+        assert [it["createdDate"] for it in result] == ["2025-06-15", "2025-03-10", "2025-01-01"]
+
+    def test_sort_missing_id_asc_last(self):
+        """缺失 id 的项在升序时排末尾"""
+        items = [
+            {"title": "no-id-A"},
+            {"id": 3, "title": "c"},
+            {"title": "no-id-B"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        result = _sort_items(items, "id-asc", [])
+        ids = [it.get("id") for it in result]
+        assert ids == [1, 2, 3, None, None]
+
+    def test_sort_missing_id_desc_last(self):
+        """缺失 id 的项在降序时排末尾"""
+        items = [
+            {"title": "no-id-A"},
+            {"id": 3, "title": "c"},
+            {"title": "no-id-B"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        result = _sort_items(items, "id-desc", [])
+        ids = [it.get("id") for it in result]
+        assert ids == [3, 2, 1, None, None]
+
+    def test_sort_missing_string_field_uses_empty(self):
+        """缺失字符串字段时降级为空字符串，不崩溃"""
+        items = [
+            {"id": 2, "title": "a"},
+            {"id": 1},
+            {"id": 3, "title": "b"},
+        ]
+        result = _sort_items(items, "title-asc", [])
+        # 缺失 title 的项按空字符串排最前
+        assert result[0]["id"] == 1
+        assert result[1]["title"] == "a"
+        assert result[2]["title"] == "b"
+
+    def test_sort_unknown_field_no_crash(self):
+        """未识别的字段不会崩溃（key_fn 为 None，不排序）"""
+        items = [
+            {"id": 3, "title": "c"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        result = _sort_items(items, "unknown-asc", [])
+        assert len(result) == 3
+        assert {it["id"] for it in result} == {1, 2, 3}
+
+    def test_sort_preserves_original(self):
+        """_sort_items 不修改原始列表"""
+        items = [
+            {"id": 3, "title": "c"},
+            {"id": 1, "title": "a"},
+            {"id": 2, "title": "b"},
+        ]
+        original_ids = [it["id"] for it in items]
+        _sort_items(items, "id-asc", [])
+        assert [it["id"] for it in items] == original_ids
+
+    def test_sort_with_none_state_in_default(self):
+        """默认排序：state 为 None 不崩溃，视为完成项"""
+        items = [
+            {"id": 1, "state": "To Do", "type": "Bug"},
+            {"id": 2, "state": None, "type": "Task"},
+            {"id": 3, "state": "Done", "type": "Bug"},
+        ]
+        result = _sort_items(items, "default", self.INCOMPLETE)
+        # None state 不在 incomplete 中，排在完成组
+        assert result[0]["state"] == "To Do"  # incomplete first
+        assert len(result) == 3
+
+
+class TestApplyRuntimeConfigSync:
+    """_apply_runtime_config 同步到 config 对象回归测试 —— 防止「设置已保存但未生效」"""
+
+    def test_notify_desktop_syncs_to_config_object(self):
+        """notify_desktop=true 同步到 Config 对象"""
+        from web import _apply_runtime_config
+        from config import Config
+
+        cfg = Config(NOTIFY_DESKTOP=False)
+        _apply_runtime_config({"notify_desktop": "true"}, cfg)
+        assert cfg.NOTIFY_DESKTOP is True
+
+    def test_notify_desktop_false_syncs_to_config_object(self):
+        """notify_desktop=false 同步到 Config 对象"""
+        from web import _apply_runtime_config
+        from config import Config
+
+        cfg = Config(NOTIFY_DESKTOP=True)
+        _apply_runtime_config({"notify_desktop": "false"}, cfg)
+        assert cfg.NOTIFY_DESKTOP is False
+
+    def test_put_notify_desktop_updates_runtime_global(self, client, mocker):
+        """PUT /api/settings 修改 notify_desktop 后 ai_fix._notify_desktop 全局已更新"""
+        import ai_fix
+
+        mock_config = {
+            "notify_desktop": "true",
+            "azure_devops_org": "x",
+            "azure_devops_project": "x",
+        }
+        mocker.patch("web.save_config", return_value=(mock_config, []))
+
+        resp = client.put("/api/settings", json={"notify_desktop": "true"})
+        assert resp.status_code == 200
+        assert ai_fix._notify_desktop is True

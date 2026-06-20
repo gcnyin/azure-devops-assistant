@@ -31,7 +31,7 @@ class TestLoadOfflineData:
         ]
         self.db.save_snapshot("Sprint 1", "TeamA", items)
 
-        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to=None, filter_by_user=False)
+        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to=None)
         assert result is not None
         iteration, loaded_items, diff_info = result
         assert iteration["name"] == "Sprint 1"
@@ -51,11 +51,10 @@ class TestLoadOfflineData:
         ]
         self.db.save_snapshot("Sprint 1", "TeamA", items)
 
-        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to="张三", filter_by_user=True)
+        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to="张三")
         assert result is not None
         _, loaded_items, _ = result
-        assert len(loaded_items) == 1
-        assert loaded_items[0]["assignedTo"] == "张三"
+        assert len(loaded_items) == 2
 
     def test_without_sprint_name_fallback(self):
         """无 sprint_name 时降级到 list_snapshots + load_snapshot_by_id"""
@@ -65,7 +64,7 @@ class TestLoadOfflineData:
         ]
         self.db.save_snapshot("Sprint 1", "TeamA", items)
 
-        result = self.load_offline_data("", "TeamA", assigned_to=None, filter_by_user=False)
+        result = self.load_offline_data("", "TeamA", assigned_to=None)
         assert result is not None
         iteration, loaded_items, diff_info = result
         assert iteration["name"] == "Sprint 1"
@@ -92,7 +91,7 @@ class TestLoadOfflineData:
         ]
         self.db.save_snapshot("Sprint 1", "TeamA", items)
 
-        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to=None, filter_by_user=False)
+        result = self.load_offline_data("Sprint 1", "TeamA", assigned_to=None)
         assert result is not None
         _, loaded_items, _ = result
         # 前 3 个应该是未完成的 (New, Active, In Progress)
