@@ -19,6 +19,13 @@ const STATUS_DOT: Record<string, string> = {
   completed: "bg-success", failed: "bg-error", cancelled: "bg-ink-muted/40",
 };
 
+function formatTime(isoStr: string | undefined): string {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("zh-CN", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function FixesTab({ fixes, bugId }: { fixes: FixItem[]; bugId: number }) {
   const navigate = useNavigate();
 
@@ -85,6 +92,12 @@ export function DetailModal({ item, stateColors, onClose, onTriggerFix, showFixe
           <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
             style={{ background: `${sc}18`, color: sc }}>{item.state}</span>
           <span>{item.assignedTo || "Unassigned"}</span>
+        </div>
+
+        {/* Timestamps */}
+        <div className="flex items-center gap-4 text-[12px] text-ink-muted">
+          <span>Created: {formatTime(item.createdDate) || "—"}</span>
+          {item.changedDate && <span>Updated: {formatTime(item.changedDate)}</span>}
         </div>
 
         {/* State transition */}

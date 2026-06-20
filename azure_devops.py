@@ -299,7 +299,7 @@ class AzureDevOpsClient:
 
         wiql = (
             f"SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], "
-            f"[System.AssignedTo], [System.CreatedDate], "
+            f"[System.AssignedTo], [System.CreatedDate], [System.ChangedDate], "
             f"[System.Description], [Microsoft.VSTS.TCM.ReproSteps] "
             f"FROM WorkItems "
             f"WHERE {' AND '.join(where_clauses)} "
@@ -345,6 +345,7 @@ class AzureDevOpsClient:
                 "type": fields.get("System.WorkItemType", "N/A"),
                 "assignedTo": assigned_to.get("displayName", "Unassigned") if assigned_to else "Unassigned",
                 "createdDate": fields.get("System.CreatedDate", "N/A"),
+                "changedDate": fields.get("System.ChangedDate", ""),
                 "description": description,
                 "htmlUrl": f"{self.config.base_url()}/{quote(self.config.PROJECT, safe='')}/_workitems/edit/{item_id}",
             })
@@ -468,7 +469,7 @@ class AzureDevOpsClient:
                 "GET", url,
                 params={
                     "ids": ids_str,
-                    "fields": "System.Title,System.State,System.WorkItemType,System.AssignedTo,System.CreatedDate,System.Description,Microsoft.VSTS.TCM.ReproSteps,Custom.Context",
+                    "fields": "System.Title,System.State,System.WorkItemType,System.AssignedTo,System.CreatedDate,System.ChangedDate,System.Description,Microsoft.VSTS.TCM.ReproSteps,Custom.Context",
                     "api-version": "7.1",
                 },
             )

@@ -9,6 +9,7 @@ export interface WorkItem {
   _state_changed?: boolean;
   _prev_state?: string;
   createdDate?: string;
+  changedDate?: string;
   fix_status?: string | null;
   fix_created_at?: string | null;
   fix_started_at?: string | null;
