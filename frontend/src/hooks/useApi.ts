@@ -9,6 +9,7 @@ import type {
   SprintsResponse,
   SettingsData,
   SaveSettingsResult,
+  KanbanSortKey,
 } from "@/types/api";
 
 const API_BASE = "";
@@ -29,13 +30,14 @@ export function useConfig() {
   });
 }
 
-export function useBoardData(view: string, sprintName?: string) {
+export function useBoardData(view: string, sprintName?: string, sortKey?: KanbanSortKey) {
   const params = new URLSearchParams();
   params.set("view", view);
   if (sprintName) params.set("sprint", sprintName);
+  if (sortKey && sortKey !== "default") params.set("sort", sortKey);
   const qs = params.toString();
   return useQuery<BoardData>({
-    queryKey: ["board", view, sprintName || ""],
+    queryKey: ["board", view, sprintName || "", sortKey || ""],
     queryFn: () => fetchJson(`/api/data?${qs}`),
     refetchInterval: sprintName ? 0 : 60_000,
   });

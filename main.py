@@ -245,9 +245,9 @@ def check_once(
 def main():
     parser = argparse.ArgumentParser(description="Azure DevOps Sprint Board Monitor (Web UI)")
     parser.add_argument("--interval", type=int, default=None, help="Check interval in minutes")
-    parser.add_argument("-w", "--web-port", type=int, default=8080,
+    parser.add_argument("-w", "--web-port", type=int, default=9001,
                        metavar="PORT",
-                       help="Web UI start port (default 8080)")
+                       help="Web UI start port (default 9001)")
     parser.add_argument("--public", action="store_true",
                        help="绑定 0.0.0.0 允许外部访问（默认仅监听 127.0.0.1）")
     args = parser.parse_args()

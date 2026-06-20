@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, type ReactNode } from "react";
 interface FilterDropdownItem {
   key: string;
   label: string;
-  count: number;
+  count?: number;
 }
 
 interface FilterDropdownProps {
@@ -95,7 +95,7 @@ export function FilterDropdown({
                     onClick={() => { onSelect(item.key); setOpen(false); }}>
                     <span>{item.label}</span>
                     {isHighlighted && highlightTag && <span className="text-[10px] bg-primary/10 text-primary px-1 py-px rounded-full font-medium">{highlightTag}</span>}
-                    <span className="ml-auto text-[11px] opacity-50">{item.count}</span>
+                    {item.count !== undefined && <span className="ml-auto text-[11px] opacity-50">{item.count}</span>}
                   </button>
                 )
               );

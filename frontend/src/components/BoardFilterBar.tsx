@@ -1,8 +1,9 @@
-import { Search, X, List, User, Columns2, Table, Download, RefreshCw } from "lucide-react";
+import { Search, X, List, User, Columns2, Table, Download, RefreshCw, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterDropdown } from "@/components/FilterDropdown";
-import type { DiffInfo, DiffFilterType } from "@/types/api";
+import type { DiffInfo, DiffFilterType, KanbanSortKey } from "@/types/api";
+import { KANBAN_SORT_OPTIONS } from "@/types/api";
 import { useState, useEffect, useRef } from "react";
 
 interface BoardFilterBarProps {
@@ -31,6 +32,8 @@ interface BoardFilterBarProps {
   totalCount: number;
   openCount: number;
   doneCount: number;
+  sortKey: KanbanSortKey;
+  onSortChange: (key: KanbanSortKey | null) => void;
 }
 
 export function BoardFilterBar({
@@ -43,6 +46,7 @@ export function BoardFilterBar({
   checkedBugCount, onBulkFix, bulkFixPending,
   stateFilter, onStateFilterChange,
   totalCount, openCount, doneCount,
+  sortKey, onSortChange,
 }: BoardFilterBarProps) {
   // ── Debounced search ──
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -83,6 +87,7 @@ export function BoardFilterBar({
   // ── Type dropdown items ──
   const typeItems = availableTypes.map((t) => ({ key: t.type.toLowerCase(), label: t.type, count: t.count }));
   const assigneeItems = availableAssignees.map((a) => ({ key: a.name.toLowerCase(), label: a.name, count: a.count }));
+  const sortItems = KANBAN_SORT_OPTIONS.map((opt) => ({ key: opt.key, label: opt.label }));
 
   return (
     <div className="space-y-2 pb-2">
@@ -144,6 +149,15 @@ export function BoardFilterBar({
             )}
           </>
         )}
+
+        {/* Sort dropdown */}
+        <FilterDropdown
+          items={sortItems}
+          selected={sortKey}
+          onSelect={(k) => onSortChange(k as KanbanSortKey | null)}
+          placeholder="Sort"
+          icon={<ArrowUpDown size={12} className="opacity-60" />}
+        />
 
         {/* Spacer — hidden on small screens */}
         <div className="flex-1 hidden sm:block" />

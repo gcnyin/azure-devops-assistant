@@ -10,8 +10,8 @@ services:
     restart: unless-stopped
 
     ports:
-      # Web UI 端口映射，可按需修改宿主机端口（如 "3000:8080"）
-      - "8080:8080"
+      # Web UI 端口映射，可按需修改宿主机端口（如 "3000:9001"）
+      - "9001:9001"
 
     # 环境变量：通过 .env 文件或直接在此处配置
     env_file:
@@ -19,8 +19,8 @@ services:
 
     # 可选：直接通过 environment 覆盖 .env 中的值
     environment:
-      # Web 端口（容器内），默认 8080
-      - WEB_PORT=8080
+      # Web 端口（容器内），默认 9001
+      - WEB_PORT=9001
       # 是否绑定 0.0.0.0 允许外部访问（容器内必须为 true）
       - BIND_PUBLIC=true
       # 额外启动参数（如 --ai-fix）

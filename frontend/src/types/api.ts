@@ -121,6 +121,31 @@ export interface SprintsResponse {
 
 export type DiffFilterType = "new" | "changed" | "gone";
 
+export type KanbanSortKey =
+  | "default"
+  | "id-asc" | "id-desc"
+  | "title-asc" | "title-desc"
+  | "type-asc" | "type-desc"
+  | "state-asc" | "state-desc"
+  | "created-asc" | "created-desc"
+  | "assignee-asc" | "assignee-desc";
+
+export const KANBAN_SORT_OPTIONS: { key: KanbanSortKey; label: string }[] = [
+  { key: "default", label: "Default" },
+  { key: "id-asc", label: "ID ↑" },
+  { key: "id-desc", label: "ID ↓" },
+  { key: "title-asc", label: "Title A-Z" },
+  { key: "title-desc", label: "Title Z-A" },
+  { key: "type-asc", label: "Type A-Z" },
+  { key: "type-desc", label: "Type Z-A" },
+  { key: "state-asc", label: "State A-Z" },
+  { key: "state-desc", label: "State Z-A" },
+  { key: "created-asc", label: "Created ↑" },
+  { key: "created-desc", label: "Created ↓" },
+  { key: "assignee-asc", label: "Assignee A-Z" },
+  { key: "assignee-desc", label: "Assignee Z-A" },
+];
+
 export interface SettingsData {
   azure_devops_org: string;
   azure_devops_project: string;

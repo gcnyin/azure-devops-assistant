@@ -9,7 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
 import { useBrowserNotification } from "@/hooks/useBrowserNotification";
-import type { BoardData, WorkItem, DiffInfo, DiffFilterType } from "@/types/api";
+import type { BoardData, WorkItem, DiffInfo, DiffFilterType, KanbanSortKey } from "@/types/api";
 
 interface BoardViewProps {
   data?: BoardData;
@@ -30,6 +30,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const typeFilterParam = searchParams.get("type") || "";
   const assigneeParam = searchParams.get("assigned") || "";
   const sprintParam = searchParams.get("sprint") || "";
+  const sortParam = (searchParams.get("sort") || "default") as KanbanSortKey;
 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone" ? diffFilterParam : null;
@@ -109,6 +110,9 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const handleAssigneeFilter = useCallback((a: string | null) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); a ? n.set("assigned", a) : n.delete("assigned"); return n; });
   }, [setSearchParams]);
+  const handleSortChange = useCallback((key: KanbanSortKey | null) => {
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); if (key && key !== "default") n.set("sort", key); else n.delete("sort"); return n; });
+  }, [setSearchParams]);
   const handleCardClick = useCallback((item: WorkItem) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("selected", String(item.id)); return n; });
   }, [setSearchParams]);
@@ -159,6 +163,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
         availableAssignees={availableAssignees} currentUser={currentUser}
         assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
+        sortKey={sortParam} onSortChange={handleSortChange}
         diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
         layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
         onExport={handleExport}

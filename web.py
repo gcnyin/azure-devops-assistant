@@ -27,6 +27,45 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 # ponytail: was renderer.py — single dict, inlined to save a file
+def _sort_items(items: list[dict], sort_key: str, incomplete_states: list[str]) -> list[dict]:
+    """Sort work items by the given sort key.
+
+    sort_key format: "{field}-{direction}" or "default" (empty/None treated as default).
+    """
+    import copy
+    result = list(items)
+
+    if not sort_key or sort_key == "default":
+        incomplete_set = {s.lower() for s in incomplete_states}
+        result.sort(key=lambda it: (
+            0 if (it.get("state", "") or "").lower() in incomplete_set else 1,
+            (it.get("state", "") or "").lower(),
+            (it.get("type", "") or "").lower(),
+        ))
+        return result
+
+    parts = sort_key.rsplit("-", 1)
+    field = parts[0]
+    direction = parts[1] if len(parts) > 1 else "asc"
+    reverse = direction == "desc"
+
+    key_map: dict[str, Any] = {
+        "id": lambda it: it.get("id", 0) or 0,
+        "title": lambda it: (it.get("title", "") or "").lower(),
+        "type": lambda it: (it.get("type", "") or "").lower(),
+        "state": lambda it: (it.get("state", "") or "").lower(),
+        "created": lambda it: it.get("createdDate", "") or "",
+        "assignee": lambda it: (it.get("assignedTo", "") or "").lower(),
+    }
+
+    key_fn = key_map.get(field)
+    if key_fn:
+        result.sort(key=key_fn, reverse=reverse)
+
+    return result
+
+
+# ── State colors ──
 STATE_COLORS_HEX: dict[str, str] = {
     "done": "#59d499",
     "closed": "#59d499",
@@ -399,12 +438,16 @@ def _get_sprint_data(sprint_name: str) -> dict | None:
 @app.route("/api/data")
 def api_data():
     sprint_name = request.args.get("sprint", "")
+    sort_key = request.args.get("sort", "")
     data = _get_sprint_data(sprint_name)
     if data is None:
         return jsonify({"error": f"Sprint '{sprint_name}' not found"}), 404
 
     view_mode = request.args.get("view", "all")
     items = data["items"]
+
+    # Apply sort (default or explicit)
+    items = _sort_items(items, sort_key, _expected_query_states)
     diff_info = data["diff_info"]
 
     if view_mode == "me" and data["assigned_to"]:
@@ -718,7 +761,7 @@ def serve_spa(path: str):
 
 # ── Server Start ──
 
-def run_web_server(start_port: int = 8080, debug: bool = False, max_attempts: int = 100, host: str = "127.0.0.1"):
+def run_web_server(start_port: int = 9001, debug: bool = False, max_attempts: int = 100, host: str = "127.0.0.1"):
     use_waitress = False
     try:
         from waitress import serve

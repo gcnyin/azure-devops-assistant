@@ -3,12 +3,14 @@ import { useSearchParams, Outlet } from "react-router";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import { useBoardData, useConfig } from "@/hooks/useApi";
+import type { KanbanSortKey } from "@/types/api";
 
 export function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchParams] = useSearchParams();
   const sprintParam = searchParams.get("sprint") || "";
-  const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData("all", sprintParam);
+  const sortParam = (searchParams.get("sort") || "default") as KanbanSortKey;
+  const { data: boardData, isError: boardError, error: boardErrorDetail } = useBoardData("all", sprintParam, sortParam);
   const { data: config } = useConfig();
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
