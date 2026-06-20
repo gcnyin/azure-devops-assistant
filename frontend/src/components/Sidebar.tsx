@@ -37,11 +37,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   else if (pathname.startsWith("/history")) activeId = "history";
   else if (pathname.startsWith("/settings")) activeId = "settings";
 
-  const allItems = boardData?.items || [];
-  const incCount = allItems.filter(
-    (it) => !["done", "closed", "completed", "resolved", "removed"].includes(it.state.toLowerCase())
-  ).length;
-  const doneCount = allItems.length - incCount;
   const sprintName = boardData?.iteration?.name || activeSprint || "";
 
   const handleNav = useCallback((path: string) => { navigate(path); }, [navigate]);
@@ -100,25 +95,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Sprint summary — hidden when collapsed or on mobile */}
-      {!effectiveCollapsed && (
-        <div className="px-3 py-3 border-t border-white/[0.08] space-y-2">
-          <div className="text-[12px] text-on-dark-soft tracking-[1.5px] uppercase font-medium">Current Sprint</div>
-          <div className="text-sm text-on-dark font-medium truncate">{sprintName || "-"}</div>
-          <div className="flex items-center gap-3 text-[13px]">
-            <span className="tabular-nums">
-              <span className="text-on-dark font-medium">{allItems.length}</span>
-              <span className="text-on-dark-soft ml-1">Total</span>
-            </span>
-            <span className="tabular-nums">
-              <span className="text-accent-amber font-medium">{incCount}</span>
-              <span className="text-on-dark-soft ml-1">Open</span>
-            </span>
-            <span className="tabular-nums">
-              <span className="text-success font-medium">{doneCount}</span>
-              <span className="text-on-dark-soft ml-1">Done</span>
-            </span>
-          </div>
+      {/* Sprint name — hidden when collapsed or on mobile */}
+      {!effectiveCollapsed && sprintName && (
+        <div className="px-3 py-3 border-t border-white/[0.08]">
+          <div className="text-[12px] text-on-dark-soft tracking-[1.5px] uppercase font-medium mb-1.5">Current Sprint</div>
+          <div className="text-sm text-on-dark font-medium truncate">{sprintName}</div>
         </div>
       )}
     </aside>
