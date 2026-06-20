@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { WorkItemsTable } from "@/components/WorkItemsTable";
 import { DetailModal } from "@/components/DetailModal";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { NotificationPopover } from "@/components/NotificationPopover";
 import { StatsRow } from "@/components/StatsRow";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
@@ -40,7 +40,19 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const [searchText, setSearchText] = useState(searchQuery);
   const [checkedBugIds, setCheckedBugIds] = useState<Set<number>>(new Set());
 
-  const { permission, enabled, requestPermission, toggleEnabled } = useBrowserNotification(data);
+  const handleNotifyNavigate = useCallback((params: Record<string, string>) => {
+    const search = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(params)) {
+      if (v) search.set(k, v); else search.delete(k);
+    }
+    const qs = search.toString();
+    navigate(`/${qs ? `?${qs}` : ""}`);
+  }, [navigate]);
+
+  const {
+    permission, enabled, categories,
+    requestPermission, toggleEnabled, toggleCategory, notifyRefresh,
+  } = useBrowserNotification(data, handleNotifyNavigate);
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
@@ -130,6 +142,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       onSuccess: (result) => {
         if (result.ok) {
           const di = result.diff_info as DiffInfo | null | undefined;
+          if (di) notifyRefresh(di);
           const nn2 = di?.new_items?.length || 0;
           const nc2 = di?.continuing_items?.filter((it) => it._state_changed).length || 0;
           const ng2 = di?.gone_items?.length || 0;
@@ -157,45 +170,14 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
           onClick={() => setView("all")}>All</Button>
         <Button variant={view === "me" ? "secondary" : "ghost"} size="sm" className="rounded-lg"
           onClick={() => setView("me")}>Me</Button>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-lg px-2"
-                onClick={() => {
-                  if (permission !== "granted") {
-                    requestPermission();
-                  } else {
-                    toggleEnabled();
-                  }
-                }}
-              >
-                {permission === "unsupported" ? (
-                  <span className="text-ink-soft text-sm">-</span>
-                ) : permission === "denied" ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
-                ) : permission === "granted" && enabled ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent-amber"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {permission === "unsupported"
-                ? "此浏览器不支持通知"
-                : permission === "denied"
-                  ? "通知权限已被拒绝"
-                  : permission !== "granted"
-                    ? "点击开启浏览器通知"
-                    : enabled
-                      ? "通知已开启 — 点击关闭"
-                      : "通知已暂停 — 点击开启"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <NotificationPopover
+          permission={permission}
+          enabled={enabled}
+          categories={categories}
+          onToggleEnabled={toggleEnabled}
+          onToggleCategory={toggleCategory}
+          onRequestPermission={requestPermission}
+        />
         <div className="flex-1" />
         {checkedBugIds.size > 0 && (
           <Button

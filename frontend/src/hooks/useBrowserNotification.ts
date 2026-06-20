@@ -1,20 +1,28 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { BoardData } from "@/types/api";
+import type { BoardData, DiffInfo } from "@/types/api";
 
-const LS_KEY = "browserNotifyEnabled";
+const LS_MAIN_KEY = "browserNotifyEnabled";
+const LS_CATEGORY_KEY = "browserNotifyCategories";
 
-function loadEnabled(): boolean {
+export type NotifyCategory = "new" | "changed" | "gone";
+
+export type CategoryToggles = Record<NotifyCategory, boolean>;
+
+const DEFAULT_CATEGORIES: CategoryToggles = { new: true, changed: true, gone: true };
+
+function loadJson<T>(key: string, fallback: T): T {
   try {
-    const v = localStorage.getItem(LS_KEY);
-    return v === null ? true : v === "true";
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    return JSON.parse(v);
   } catch {
-    return true;
+    return fallback;
   }
 }
 
-function saveEnabled(v: boolean) {
+function saveJson(key: string, v: unknown) {
   try {
-    localStorage.setItem(LS_KEY, String(v));
+    localStorage.setItem(key, JSON.stringify(v));
   } catch {
     // ignore
   }
@@ -23,20 +31,34 @@ function saveEnabled(v: boolean) {
 export interface BrowserNotificationState {
   permission: NotificationPermission | "unsupported";
   enabled: boolean;
+  categories: CategoryToggles;
   requestPermission: () => Promise<void>;
   toggleEnabled: () => void;
+  toggleCategory: (cat: NotifyCategory) => void;
+  notifyRefresh: (diff: DiffInfo) => void;
 }
 
 export function useBrowserNotification(
   data: BoardData | undefined,
+  onNavigate?: (params: Record<string, string>) => void,
 ): BrowserNotificationState {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   );
-  const [enabled, setEnabled] = useState(loadEnabled);
+  const [enabled, setEnabled] = useState(() => loadJson(LS_MAIN_KEY, true));
+  const [categories, setCategories] = useState<CategoryToggles>(() =>
+    loadJson(LS_CATEGORY_KEY, DEFAULT_CATEGORIES),
+  );
+
   const prevDiffRef = useRef<{ newCount: number; changedCount: number; goneCount: number } | null>(null);
   const isInitialRef = useRef(true);
   const prevSprintRef = useRef<string>("");
+
+  // 用于通知点击时导航 -- 存最近一次通知的上下文
+  const lastNotifyCtx = useRef<{ diffType: NotifyCategory | null; sprint: string }>({
+    diffType: null,
+    sprint: "",
+  });
 
   // 跟踪 sprint 切换，切换时重置 isInitial
   const currentSprint = data?.iteration?.name || "";
@@ -48,13 +70,12 @@ export function useBrowserNotification(
     }
   }, [currentSprint]);
 
-  // 监听 permission 变化（用户可能在浏览器设置中修改）
+  // 监听 permission 变化
   useEffect(() => {
     if (typeof Notification === "undefined") {
       setPermission("unsupported");
       return;
     }
-    // 某些浏览器不支持 onpermissionchange 事件
     const checkPermission = () => setPermission(Notification.permission);
     if ("permissions" in navigator) {
       navigator.permissions
@@ -66,9 +87,6 @@ export function useBrowserNotification(
           // 不支持 query，fallback
         });
     }
-    return () => {
-      // cleanup 由浏览器处理
-    };
   }, []);
 
   const requestPermission = useCallback(async () => {
@@ -87,85 +105,177 @@ export function useBrowserNotification(
   const toggleEnabled = useCallback(() => {
     setEnabled((prev) => {
       const next = !prev;
-      saveEnabled(next);
+      saveJson(LS_MAIN_KEY, next);
       return next;
     });
   }, []);
 
-  // 主逻辑：对比 diff 并发送通知
-  useEffect(() => {
-    if (permission !== "granted" || !enabled) return;
-    if (!data || !data.diff_info) return;
+  const toggleCategory = useCallback((cat: NotifyCategory) => {
+    setCategories((prev) => {
+      const next = { ...prev, [cat]: !prev[cat] };
+      saveJson(LS_CATEGORY_KEY, next);
+      return next;
+    });
+  }, []);
 
-    const diff = data.diff_info;
+  // 从 DiffInfo 提取计数
+  const extractCounts = useCallback((diff: DiffInfo) => {
     const newCount = diff.new_items?.length || 0;
-    const changedCount =
-      (diff.continuing_items || []).filter((it) => it._state_changed).length;
+    const changedCount = (diff.continuing_items || []).filter((it) => it._state_changed).length;
     const goneCount = diff.gone_items?.length || 0;
+    return { newCount, changedCount, goneCount };
+  }, []);
 
-    // 首次加载：仅记录状态，不触发通知
-    if (isInitialRef.current) {
-      isInitialRef.current = false;
-      prevDiffRef.current = { newCount, changedCount, goneCount };
-      return;
-    }
+  // 判断哪些启用的分类有变化，返回触发类型列表
+  const getTriggerCategories = useCallback(
+    (prev: { newCount: number; changedCount: number; goneCount: number } | null, curr: {
+      newCount: number; changedCount: number; goneCount: number;
+    }) => {
+      if (!prev) return { types: [] as NotifyCategory[], hasChange: true };
+      const types: NotifyCategory[] = [];
+      if (categories.new && curr.newCount !== prev.newCount) types.push("new");
+      if (categories.changed && curr.changedCount !== prev.changedCount) types.push("changed");
+      if (categories.gone && curr.goneCount !== prev.goneCount) types.push("gone");
+      return { types, hasChange: types.length > 0 };
+    },
+    [categories],
+  );
 
-    // 仅在标签页后台时通知
-    if (!document.hidden) {
-      prevDiffRef.current = { newCount, changedCount, goneCount };
-      return;
-    }
+  // 构建通知标题和正文
+  const buildNotificationContent = useCallback(
+    (counts: { newCount: number; changedCount: number; goneCount: number }, triggerTypes: NotifyCategory[]) => {
+      const sprint = data?.iteration?.name || "";
+      const project = data?.project || "Azure DevOps";
 
-    const prev = prevDiffRef.current;
+      const title = sprint ? `${project} / ${sprint}` : project;
 
-    // 没有变化则跳过
-    if (
-      prev &&
-      prev.newCount === newCount &&
-      prev.changedCount === changedCount &&
-      prev.goneCount === goneCount
-    ) {
-      return;
-    }
+      const parts: string[] = [];
+      if (triggerTypes.includes("new") && counts.newCount) parts.push(`+${counts.newCount} 新增`);
+      if (triggerTypes.includes("changed") && counts.changedCount) parts.push(`~${counts.changedCount} 状态变化`);
+      if (triggerTypes.includes("gone") && counts.goneCount) parts.push(`-${counts.goneCount} 消失`);
 
-    prevDiffRef.current = { newCount, changedCount, goneCount };
+      let body = parts.join("  ");
 
-    // 无实际变化量
-    if (newCount === 0 && changedCount === 0 && goneCount === 0) return;
+      // 纯新增且仅 1-3 条时，附标题
+      if (
+        triggerTypes.length === 1 &&
+        triggerTypes[0] === "new" &&
+        counts.newCount <= 3 &&
+        counts.newCount > 0 &&
+        data?.diff_info
+      ) {
+        const titles = data.diff_info.new_items
+          .slice(0, 3)
+          .map((it) => it.title)
+          .join(", ");
+        body = `+${counts.newCount} 新增: ${titles}`;
+      }
 
-    const sprint = data.iteration?.name || "";
-    const project = data.project || "Azure DevOps";
+      return { title, body };
+    },
+    [data],
+  );
 
-    const parts: string[] = [];
-    if (newCount) parts.push(`+${newCount} 新增`);
-    if (changedCount) parts.push(`~${changedCount} 状态变化`);
-    if (goneCount) parts.push(`-${goneCount} 消失`);
+  // 发送通知
+  const sendNotification = useCallback(
+    (title: string, body: string, primaryType: NotifyCategory | null, sprint: string) => {
+      lastNotifyCtx.current = { diffType: primaryType, sprint };
+      try {
+        const notification = new Notification(title, {
+          body,
+          icon: "/favicon.ico",
+          tag: "sprint-monitor",
+        });
 
-    const title = `${project} / ${sprint}`;
-    let body = parts.join("  ");
-    const firstNewItem = diff.new_items?.[0];
-    if (newCount === 1 && firstNewItem) {
-      body += `\n${firstNewItem.title}`;
-    }
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+          const ctx = lastNotifyCtx.current;
+          if (ctx.diffType && onNavigate) {
+            const params: Record<string, string> = { diff: ctx.diffType };
+            if (ctx.sprint) params.sprint = ctx.sprint;
+            onNavigate(params);
+          }
+        };
 
-    try {
-      const notification = new Notification(title, {
-        body,
-        icon: "/favicon.ico",
-        tag: "sprint-monitor", // 同一 tag 会替换已有通知
-      });
+        setTimeout(() => notification.close(), 8000);
+      } catch {
+        // 通知创建失败，静默忽略
+      }
+    },
+    [onNavigate],
+  );
 
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
+  // 主通知逻辑（提取为独立函数，供轮询和 refresh 共用）
+  const processDiff = useCallback(
+    (diff: DiffInfo, isRefresh: boolean) => {
+      if (permission !== "granted" || !enabled) return;
+      if (!diff) return;
 
-      // 8 秒后自动关闭
-      setTimeout(() => notification.close(), 8000);
-    } catch {
-      // 通知创建失败，静默忽略
-    }
-  }, [data, permission, enabled]);
+      const counts = extractCounts(diff);
+      const { types, hasChange } = getTriggerCategories(isRefresh ? null : prevDiffRef.current, counts);
 
-  return { permission, enabled, requestPermission, toggleEnabled };
+      // 刷新模式强制通过（isRefresh 时 prevDiffRef 传 null，hasChange 恒为 true）
+      if (!hasChange) return;
+
+      // 仅前台时除外（手动 refresh 允许前台通知）
+      if (!document.hidden && !isRefresh) {
+        prevDiffRef.current = counts;
+        return;
+      }
+
+      // 首次加载：仅记录状态，不触发通知
+      if (isInitialRef.current && !isRefresh) {
+        isInitialRef.current = false;
+        prevDiffRef.current = counts;
+        return;
+      }
+
+      // 没有任何启用的分类有变化
+      if (types.length === 0) {
+        prevDiffRef.current = counts;
+        return;
+      }
+
+      const { title, body } = buildNotificationContent(counts, types);
+      // 主触发类型：优先取第一个，用于点击导航
+      const primaryType = types[0];
+
+      sendNotification(title, body, primaryType, data?.iteration?.name || "");
+
+      if (!isRefresh) {
+        isInitialRef.current = false;
+      }
+      prevDiffRef.current = counts;
+    },
+    [
+      permission, enabled, extractCounts, getTriggerCategories,
+      buildNotificationContent, sendNotification, data,
+    ],
+  );
+
+  // 轮询触发：监听 data 变化
+  useEffect(() => {
+    if (!data?.diff_info) return;
+    processDiff(data.diff_info, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  // 手动 refresh 入口
+  const notifyRefresh = useCallback(
+    (diff: DiffInfo) => {
+      processDiff(diff, true);
+    },
+    [processDiff],
+  );
+
+  return {
+    permission,
+    enabled,
+    categories,
+    requestPermission,
+    toggleEnabled,
+    toggleCategory,
+    notifyRefresh,
+  };
 }

@@ -232,6 +232,7 @@ export function WorkItemsTable({
             type="checkbox"
             className="cursor-pointer w-4 h-4"
             checked={checkedBugIds?.has(it.id) ?? false}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               e.stopPropagation();
               onToggleBugCheck?.(it.id);
