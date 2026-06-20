@@ -22,6 +22,7 @@ export function useFilteredItems(
   stateFilter: string,
   searchQuery: string,
   incompleteStates: string[],
+  typeFilter?: string | null,
 ) {
   return useMemo(() => {
     const incompleteSet = new Set(
@@ -29,6 +30,11 @@ export function useFilteredItems(
     );
 
     let items = allItems;
+
+    // Type filter (bug, task, user story, etc.)
+    if (typeFilter) {
+      items = items.filter((it) => (it.type || "").toLowerCase() === typeFilter.toLowerCase());
+    }
 
     // Diff filter
     if (diffFilter && diff) {
@@ -67,5 +73,5 @@ export function useFilteredItems(
     }
 
     return items;
-  }, [allItems, diff, diffFilter, stateFilter, searchQuery, incompleteStates]);
+  }, [allItems, diff, diffFilter, stateFilter, searchQuery, incompleteStates, typeFilter]);
 }

@@ -27,10 +27,12 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const diffFilterParam = searchParams.get("diff") || "";
   const layoutParam = searchParams.get("layout") || "kanban";
   const selectedParam = searchParams.get("selected");
+  const typeFilterParam = searchParams.get("type") || "";
 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone" ? diffFilterParam : null;
   const layoutMode = (layoutParam === "table" ? "table" : "kanban") as "kanban" | "table";
+  const typeFilter = typeFilterParam || null;
 
   const fixesMutation = useFixesMutation();
   const refreshMutation = useRefreshMutation();
@@ -45,7 +47,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
-  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates);
+  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates, typeFilter);
 
   const selectedItem = useMemo(() => {
     if (!selectedParam) return null;
@@ -64,6 +66,9 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   }, [setSearchParams]);
   const handleLayoutChange = useCallback((m: "kanban" | "table") => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); m === "table" ? n.set("layout", "table") : n.delete("layout"); return n; });
+  }, [setSearchParams]);
+  const handleTypeFilter = useCallback((t: string | null) => {
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); t ? n.set("type", t) : n.delete("type"); return n; });
   }, [setSearchParams]);
   const handleCardClick = useCallback((item: WorkItem) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("selected", String(item.id)); return n; });
@@ -105,6 +110,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load"} />}
 
         <BoardFilterBar view={view} onViewChange={setView} searchQuery={searchQuery} onSearchChange={handleSearch}
+          typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
           diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
           layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
           onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}

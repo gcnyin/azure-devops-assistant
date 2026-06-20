@@ -7,6 +7,8 @@ interface BoardFilterBarProps {
   onViewChange: (v: "all" | "me") => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  typeFilter: string | null;
+  onTypeFilterChange: (t: string | null) => void;
   diffInfo: DiffInfo | null;
   diffFilter: DiffFilterType | null;
   onDiffFilterChange: (f: DiffFilterType | null) => void;
@@ -21,6 +23,7 @@ interface BoardFilterBarProps {
 
 export function BoardFilterBar({
   view, onViewChange, searchQuery, onSearchChange,
+  typeFilter, onTypeFilterChange,
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
@@ -49,6 +52,18 @@ export function BoardFilterBar({
         <Input className="pl-8 h-8 text-[13px]" placeholder="Filter cards..." value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)} />
       </div>
+
+      {/* Type filter: Bug toggle */}
+      <button
+        className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
+          typeFilter === "bug"
+            ? "bg-error/10 text-error border-error/30"
+            : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
+        }`}
+        onClick={() => onTypeFilterChange(typeFilter === "bug" ? null : "bug")}
+      >
+        Bug
+      </button>
 
       {/* Diff badges — pill style */}
       {nn > 0 && (
