@@ -7,6 +7,7 @@ interface BoardFilterBarProps {
   onViewChange: (v: "all" | "me") => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  availableTypes: { type: string; count: number }[];
   typeFilter: string | null;
   onTypeFilterChange: (t: string | null) => void;
   diffInfo: DiffInfo | null;
@@ -21,9 +22,20 @@ interface BoardFilterBarProps {
   bulkFixPending: boolean;
 }
 
+const TYPE_STYLES: Record<string, { activeBg: string; activeText: string; activeBorder: string }> = {
+  bug:    { activeBg: "bg-error/10",    activeText: "text-error",       activeBorder: "border-error/30" },
+  task:   { activeBg: "bg-accent-amber/10", activeText: "text-accent-amber", activeBorder: "border-accent-amber/30" },
+  "user story": { activeBg: "bg-accent-teal/10", activeText: "text-accent-teal", activeBorder: "border-accent-teal/30" },
+  feature:{ activeBg: "bg-primary/10",  activeText: "text-primary",     activeBorder: "border-primary/30" },
+  epic:   { activeBg: "bg-fuchsia-700/10", activeText: "text-fuchsia-600", activeBorder: "border-fuchsia-600/30" },
+  issue:  { activeBg: "bg-error/10",    activeText: "text-error",       activeBorder: "border-error/30" },
+};
+
+const DEFAULT_TYPE_STYLE = { activeBg: "bg-ink-muted/10", activeText: "text-ink-muted", activeBorder: "border-ink-muted/30" };
+
 export function BoardFilterBar({
   view, onViewChange, searchQuery, onSearchChange,
-  typeFilter, onTypeFilterChange,
+  availableTypes, typeFilter, onTypeFilterChange,
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
@@ -34,7 +46,7 @@ export function BoardFilterBar({
 
   return (
     <div className="flex items-center gap-2 py-2 flex-wrap">
-      {/* View toggle — category-tab style */}
+      {/* View toggle */}
       <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
         <button className={`px-3 py-1.5 text-[14px] font-medium rounded-[6px] transition-colors ${view === "all" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
           onClick={() => onViewChange("all")}>All</button>
@@ -53,19 +65,27 @@ export function BoardFilterBar({
           onChange={(e) => onSearchChange(e.target.value)} />
       </div>
 
-      {/* Type filter: Bug toggle */}
-      <button
-        className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
-          typeFilter === "bug"
-            ? "bg-error/10 text-error border-error/30"
-            : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
-        }`}
-        onClick={() => onTypeFilterChange(typeFilter === "bug" ? null : "bug")}
-      >
-        Bug
-      </button>
+      {/* Type filter pills */}
+      {availableTypes.map((t) => {
+        const isActive = typeFilter?.toLowerCase() === t.type.toLowerCase();
+        const style = TYPE_STYLES[t.type.toLowerCase()] || DEFAULT_TYPE_STYLE;
+        return (
+          <button
+            key={t.type}
+            className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
+              isActive
+                ? `${style.activeBg} ${style.activeText} ${style.activeBorder}`
+                : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
+            }`}
+            onClick={() => onTypeFilterChange(isActive ? null : t.type)}
+          >
+            {t.type}
+            <span className="ml-1 opacity-60 text-[11px]">{t.count}</span>
+          </button>
+        );
+      })}
 
-      {/* Diff badges — pill style */}
+      {/* Diff badges */}
       {nn > 0 && (
         <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
           onClick={() => onDiffFilterChange(diffFilter === "new" ? null : "new")}>+{nn} New</span>
@@ -100,7 +120,7 @@ export function BoardFilterBar({
         </button>
       </div>
 
-      {/* Refresh — Coral primary */}
+      {/* Refresh */}
       <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh}>
         {refreshPending ? "Refreshing..." : "Refresh"}
       </Button>

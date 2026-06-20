@@ -47,6 +47,19 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
 
   const allItems = data?.items || [];
   const diff = data?.diff_info || null;
+
+  const availableTypes = useMemo(() => {
+    const typeMap: Record<string, number> = {};
+    for (const it of allItems) {
+      const t = (it.type || "").trim();
+      if (!t) continue;
+      typeMap[t] = (typeMap[t] || 0) + 1;
+    }
+    return Object.entries(typeMap)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => a.type.localeCompare(b.type));
+  }, [allItems]);
+
   const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates, typeFilter);
 
   const selectedItem = useMemo(() => {
@@ -110,7 +123,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load"} />}
 
         <BoardFilterBar view={view} onViewChange={setView} searchQuery={searchQuery} onSearchChange={handleSearch}
-          typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
+          availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
           diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
           layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
           onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
