@@ -103,7 +103,7 @@ export function DetailModal({ item, stateColors, onClose, onTriggerFix, showFixe
         {/* Description */}
         {item.description ? (
           <div className="relative bg-surface-card rounded-[8px]">
-            <div className="whitespace-pre-wrap leading-normal text-ink-body text-[14px] p-6 max-h-[400px] overflow-y-auto">{item.description.replace(/\n{3,}/g, '\n\n').replace(/\r\n/g, '\n')}</div>
+            <div className="whitespace-pre-wrap leading-snug text-ink-body text-[14px] p-6 max-h-[400px] overflow-y-auto">{item.description.replace(/\n{3,}/g, '\n\n').replace(/\r\n/g, '\n')}</div>
             <button className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-[8px] bg-canvas border border-hairline text-ink-muted hover:text-ink transition-colors text-xs"
               onClick={async () => { await navigator.clipboard.writeText(item.description); }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>

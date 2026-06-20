@@ -78,7 +78,7 @@ export function RightPanel({ item, stateColors, onClose, onTriggerFix }: RightPa
           <>
             {item.description ? (
               <div className="relative bg-surface-card rounded-[12px] mb-4">
-                <div className="whitespace-pre-wrap leading-relaxed text-ink-body text-[14px] p-4 max-h-[500px] overflow-y-auto">{item.description}</div>
+                <div className="whitespace-pre-wrap leading-snug text-ink-body text-[14px] p-4 max-h-[500px] overflow-y-auto">{item.description}</div>
                 <button className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-[8px] bg-canvas border border-hairline text-ink-muted hover:text-ink transition-colors text-[12px]"
                   onClick={async () => { await navigator.clipboard.writeText(item.description); }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
