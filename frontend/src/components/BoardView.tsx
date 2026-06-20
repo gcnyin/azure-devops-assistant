@@ -26,6 +26,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const diffFilterParam = searchParams.get("diff") || "";
   const layoutParam = searchParams.get("layout") || "kanban";
   const selectedParam = searchParams.get("selected");
+  const stateFilterParam = searchParams.get("state") || "";
   const typeFilterParam = searchParams.get("type") || "";
   const assigneeParam = searchParams.get("assigned") || "";
   const sprintParam = searchParams.get("sprint") || "";
@@ -33,6 +34,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone" ? diffFilterParam : null;
   const layoutMode = (layoutParam === "table" ? "table" : "kanban") as "kanban" | "table";
+  const stateFilter = stateFilterParam || "all";
   const typeFilter = typeFilterParam || null;
   const assigneeFilter = assigneeParam || null;
 
@@ -71,7 +73,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [allItems]);
 
-  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates, typeFilter, assigneeFilter);
+  const filteredItems = useFilteredItems(allItems, diff, diffFilter, stateFilter, searchQuery, incompleteStates, typeFilter, assigneeFilter);
 
   const selectedItem = useMemo(() => {
     if (!selectedParam) return null;
@@ -97,6 +99,9 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   }, [setSearchParams]);
   const handleLayoutChange = useCallback((m: "kanban" | "table") => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); m === "table" ? n.set("layout", "table") : n.delete("layout"); return n; });
+  }, [setSearchParams]);
+  const handleStateFilter = useCallback((f: string | null) => {
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); f ? n.set("state", f) : n.delete("state"); return n; });
   }, [setSearchParams]);
   const handleTypeFilter = useCallback((t: string | null) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); t ? n.set("type", t) : n.delete("type"); return n; });
@@ -159,6 +164,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
         onExport={handleExport}
         onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
         checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending}
+        stateFilter={stateFilter} onStateFilterChange={handleStateFilter}
         totalCount={totalCount} openCount={openCount} doneCount={doneCount}
       />
 

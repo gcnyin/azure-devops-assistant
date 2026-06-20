@@ -26,6 +26,8 @@ interface BoardFilterBarProps {
   checkedBugCount: number;
   onBulkFix: () => void;
   bulkFixPending: boolean;
+  stateFilter: string;
+  onStateFilterChange: (f: string | null) => void;
   totalCount: number;
   openCount: number;
   doneCount: number;
@@ -39,6 +41,7 @@ export function BoardFilterBar({
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onExport, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
+  stateFilter, onStateFilterChange,
   totalCount, openCount, doneCount,
 }: BoardFilterBarProps) {
   // ── Debounced search ──
@@ -148,8 +151,14 @@ export function BoardFilterBar({
         {/* Stats */}
         <div className="flex items-center gap-2 sm:gap-3 text-[12px] sm:text-[13px] tabular-nums shrink-0">
           <span><span className="font-medium text-ink">{totalCount}</span> <span className="text-ink-muted">Total</span></span>
-          <span><span className="font-medium text-accent-amber">{openCount}</span> <span className="text-ink-muted">Open</span></span>
-          <span><span className="font-medium text-success">{doneCount}</span> <span className="text-ink-muted">Done</span></span>
+          <span className={`cursor-pointer select-none${stateFilter === "open" ? " ring-1 ring-accent-amber/40 rounded px-1 -mx-1" : ""}`}
+            onClick={() => onStateFilterChange(stateFilter === "open" ? null : "open")}>
+            <span className="font-medium text-accent-amber">{openCount}</span> <span className="text-ink-muted">Open</span>
+          </span>
+          <span className={`cursor-pointer select-none${stateFilter === "done" ? " ring-1 ring-success/40 rounded px-1 -mx-1" : ""}`}
+            onClick={() => onStateFilterChange(stateFilter === "done" ? null : "done")}>
+            <span className="font-medium text-success">{doneCount}</span> <span className="text-ink-muted">Done</span>
+          </span>
         </div>
 
         {/* Layout toggle — icon-only on small screens */}
