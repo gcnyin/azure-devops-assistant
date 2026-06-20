@@ -61,6 +61,10 @@ def init_db():
         # 启用 WAL 模式：允许并发读取不阻塞写入，避免 Web 线程与后台采集线程之间的锁冲突
         # WAL 是持久化设置，只需在初始化时执行一次
         conn.execute("PRAGMA journal_mode=WAL")
+        # 清理已删除的配置项历史数据
+        conn.execute(
+            "DELETE FROM app_config WHERE key IN ('ai_model', 'ai_api_base_url', 'ai_api_key')"
+        )
         conn.commit()
     logger.debug("数据库表结构检查完成")
 
@@ -413,9 +417,6 @@ _CONFIG_META: dict[str, tuple[str, bool]] = {
     "web_access_token": ("", True),
     "log_dir": ("", False),
     "ai_provider": ("auto", False),
-    "ai_model": ("", False),
-    "ai_api_base_url": ("", False),
-    "ai_api_key": ("", True),
 }
 
 

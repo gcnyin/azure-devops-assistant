@@ -169,9 +169,6 @@ def _apply_runtime_config(data: dict[str, str]):
         set_target_branch as ai_set_target_branch,
         set_work_dir as ai_set_work_dir,
         set_ai_provider,
-        set_ai_model,
-        set_ai_api_base_url,
-        set_ai_api_key,
     )
 
     # 查询状态
@@ -196,11 +193,8 @@ def _apply_runtime_config(data: dict[str, str]):
     if tb:
         ai_set_target_branch(tb)
 
-    # AI Provider / Model
+    # AI Provider
     set_ai_provider(data.get("ai_provider", "auto"))
-    set_ai_model(data.get("ai_model", ""))
-    set_ai_api_base_url(data.get("ai_api_base_url", ""))
-    set_ai_api_key(data.get("ai_api_key", ""))
 
     # Web 认证
     _access_token = data.get("web_access_token", "").strip()

@@ -137,9 +137,6 @@ export interface SettingsData {
   web_access_token: string;
   log_dir: string;
   ai_provider: string;
-  ai_model: string;
-  ai_api_base_url: string;
-  ai_api_key: string;
 }
 
 export interface SaveSettingsResult {

@@ -31,9 +31,6 @@ _work_dir: str = "."
 _timeout_seconds: int = 300
 _target_branch: str = "develop"
 _ai_provider: str = "auto"
-_ai_model: str = ""
-_ai_api_base_url: str = ""
-_ai_api_key: str = ""
 
 
 def set_work_dir(work_dir: str):
@@ -54,21 +51,6 @@ def set_target_branch(branch: str):
 def set_ai_provider(provider: str):
     global _ai_provider
     _ai_provider = provider.strip().lower() if provider else "auto"
-
-
-def set_ai_model(model: str):
-    global _ai_model
-    _ai_model = model.strip() if model else ""
-
-
-def set_ai_api_base_url(url: str):
-    global _ai_api_base_url
-    _ai_api_base_url = url.strip() if url else ""
-
-
-def set_ai_api_key(key: str):
-    global _ai_api_key
-    _ai_api_key = key.strip() if key else ""
 
 
 def start_worker():
@@ -575,12 +557,7 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
             logger.warning("配置的 AI provider [%s] 不在已知候选列表中", provider)
             return None, provider, f"未知的 AI provider: {provider}"
 
-    # 构建子进程环境变量
     env = os.environ.copy()
-    if _ai_api_base_url:
-        env.setdefault("OPENAI_BASE_URL", _ai_api_base_url)
-    if _ai_api_key:
-        env.setdefault("OPENAI_API_KEY", _ai_api_key)
 
     errors: list[str] = []
     last_agent: str | None = None
@@ -596,9 +573,6 @@ def _try_agent(prompt: str) -> tuple[str | None, str | None, str | None]:
         logger.info("调用 AI agent [%s] 生成修复...", name)
         try:
             args = list(build_args(prompt))
-            if _ai_model:
-                args.append("--model")
-                args.append(_ai_model)
             result = subprocess.run(
                 args,
                 capture_output=True,
