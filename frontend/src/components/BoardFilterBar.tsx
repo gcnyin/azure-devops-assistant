@@ -82,8 +82,8 @@ export function BoardFilterBar({
   return (
     <div className="space-y-2 pb-2">
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
+        {/* Search — full width on small screens */}
+        <div className="relative flex-1 min-w-[160px] sm:max-w-[320px]">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -150,33 +150,32 @@ export function BoardFilterBar({
           </>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Spacer — hidden on small screens */}
+        <div className="flex-1 hidden sm:block" />
 
-        {/* Stats */}
-        <div className="flex items-center gap-3 text-[13px] tabular-nums shrink-0">
+        {/* Stats — wrap to own line on small screens */}
+        <div className="flex items-center gap-2 sm:gap-3 text-[12px] sm:text-[13px] tabular-nums shrink-0 w-full sm:w-auto justify-end sm:justify-start pt-1 sm:pt-0">
           <span><span className="font-medium text-ink">{totalCount}</span> <span className="text-ink-muted">Total</span></span>
           <span><span className="font-medium text-accent-amber">{openCount}</span> <span className="text-ink-muted">Open</span></span>
           <span><span className="font-medium text-success">{doneCount}</span> <span className="text-ink-muted">Done</span></span>
         </div>
 
-        {/* Layout toggle */}
-        <span className="text-hairline select-none mx-0.5">|</span>
-        <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
-          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-2 ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+        {/* Layout toggle — icon-only on small screens */}
+        <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1 shrink-0">
+          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-1.5 sm:px-2 ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("kanban")} title="Kanban view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="10" rx="1" /></svg>
-            <span className="text-[12px] font-medium">看板</span>
+            <span className="text-[12px] font-medium hidden sm:inline">看板</span>
           </button>
-          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-2 ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-1.5 sm:px-2 ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("table")} title="Table view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
-            <span className="text-[12px] font-medium">表格</span>
+            <span className="text-[12px] font-medium hidden sm:inline">表格</span>
           </button>
         </div>
 
         {/* Refresh */}
-        <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh} title="Refresh">
+        <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh} title="Refresh" className="shrink-0">
           {refreshPending ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
               <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -190,7 +189,7 @@ export function BoardFilterBar({
 
         {/* Bulk fix */}
         {checkedBugCount > 0 && (
-          <Button variant="default" size="sm" disabled={bulkFixPending} onClick={onBulkFix}>
+          <Button variant="default" size="sm" disabled={bulkFixPending} onClick={onBulkFix} className="shrink-0">
             {bulkFixPending ? "Fixing..." : `Fix selected (${checkedBugCount})`}
           </Button>
         )}

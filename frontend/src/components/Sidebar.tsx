@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router";
 import { useBoardData, useSprints } from "@/hooks/useApi";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface SidebarProps { collapsed: boolean; onToggle: () => void; }
 
@@ -14,6 +14,19 @@ const NAV_ITEMS = [
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Below md (768px): always collapsed, ignore manual toggle
+  const effectiveCollapsed = isMobile ? true : collapsed;
+
   const { data: sprintsData } = useSprints();
   const activeSprint = sprintsData?.current_sprint || "";
   const { data: boardData } = useBoardData("all", "");
@@ -36,29 +49,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={`flex flex-col bg-sidebar h-screen sticky top-0 transition-all duration-200 shrink-0 ${
-        collapsed ? "w-[56px]" : "w-[220px]"
+        effectiveCollapsed ? "w-[56px]" : "w-[220px]"
       }`}
     >
-      {/* Collapse toggle */}
-      <div className="flex items-center h-14 px-3">
-        {!collapsed && (
+      {/* Collapse toggle — hidden on mobile (auto-collapsed) */}
+      <div className={`flex items-center h-14 px-3 ${isMobile ? "justify-center" : ""}`}>
+        {!effectiveCollapsed && (
           <span className="text-sm font-medium text-on-dark truncate flex-1">Sprint Monitor</span>
         )}
-        <button
-          onClick={onToggle}
-          className={`p-1.5 rounded-md text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover transition-colors ${
-            collapsed ? "mx-auto" : ""
-          }`}
-          title={collapsed ? "Expand" : "Collapse"}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {collapsed ? (
-              <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M14 9l3 3-3 3" /></>
-            ) : (
-              <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M10 9l-3 3 3 3" /></>
-            )}
-          </svg>
-        </button>
+        {!isMobile && (
+          <button
+            onClick={onToggle}
+            className={`p-1.5 rounded-md text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover transition-colors ${
+              collapsed ? "mx-auto" : ""
+            }`}
+            title={collapsed ? "Expand" : "Collapse"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {collapsed ? (
+                <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M14 9l3 3-3 3" /></>
+              ) : (
+                <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M10 9l-3 3 3 3" /></>
+              )}
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -70,23 +85,23 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               key={item.id}
               onClick={() => handleNav(item.path)}
               className={`flex items-center gap-3 w-full rounded-[8px] text-[14px] font-medium transition-colors ${
-                collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2"
+                effectiveCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2"
               } ${
                 isActive
                   ? "bg-sidebar-active text-primary"
                   : "text-on-dark-soft hover:text-on-dark hover:bg-sidebar-hover"
               }`}
-              title={collapsed ? item.label : undefined}
+              title={effectiveCollapsed ? item.label : undefined}
             >
               <item.icon active={isActive} />
-              {!collapsed && <span>{item.label}</span>}
+              {!effectiveCollapsed && <span>{item.label}</span>}
             </button>
           );
         })}
       </nav>
 
-      {/* Sprint summary */}
-      {!collapsed && (
+      {/* Sprint summary — hidden when collapsed or on mobile */}
+      {!effectiveCollapsed && (
         <div className="px-3 py-3 border-t border-white/[0.08] space-y-2">
           <div className="text-[12px] text-on-dark-soft tracking-[1.5px] uppercase font-medium">Current Sprint</div>
           <div className="text-sm text-on-dark font-medium truncate">{sprintName || "-"}</div>

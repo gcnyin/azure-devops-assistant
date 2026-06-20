@@ -176,4 +176,19 @@
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-hairline); border-radius: 2px; }
   .scrollbar-thin:hover::-webkit-scrollbar-thumb { background: var(--color-ink-muted); }
+
+  /* ── Kanban card density tiers ── */
+  /* Compact: column < 300px  — single-row header, title 2 lines, hide date/transition */
+  .kanban-card-compact .card-header { @apply gap-1 mb-1.5; }
+  .kanban-card-compact .card-title { @apply text-[12px] line-clamp-2 mb-1.5; }
+  .kanban-card-compact .card-meta-date { @apply hidden; }
+  .kanban-card-compact .card-transition { @apply hidden; }
+
+  /* Standard: column 300-400px — slightly smaller than comfortable */
+  .kanban-card-standard .card-header { @apply gap-1.5 mb-1.5; }
+  .kanban-card-standard .card-title { @apply text-[13px] line-clamp-2 mb-1.5; }
+
+  /* Comfortable: column > 400px — current full layout */
+  .kanban-card-comfortable .card-header { @apply gap-1.5 mb-2; }
+  .kanban-card-comfortable .card-title { @apply text-[14px] line-clamp-3 mb-2; }
 }

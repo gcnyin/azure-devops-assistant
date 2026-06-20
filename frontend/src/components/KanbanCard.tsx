@@ -9,6 +9,7 @@ interface KanbanCardProps {
   isDimmed: boolean;
   onClick: () => void;
   onTriggerFix?: (bugId: number) => void;
+  density?: "compact" | "standard" | "comfortable";
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -46,14 +47,25 @@ function FixButton({ item, onTriggerFix }: { item: WorkItem; onTriggerFix?: (bug
   );
 }
 
-export function KanbanCard({ item, rowType, stateColors, isSelected, isDimmed, onClick, onTriggerFix }: KanbanCardProps) {
+export function KanbanCard({
+  item, rowType, stateColors, isSelected, isDimmed, onClick, onTriggerFix,
+  density = "comfortable",
+}: KanbanCardProps) {
   const sc = getStateColor(item.state, stateColors);
   const typeColor = getTypeColor(item.type || "");
   const prev = item._prev_state;
 
+  // Per-density sizing
+  const densityStyles: Record<string, { pad: string; typeSize: string; idSize: string; titleClass: string; metaSize: string; dotSize: string }> = {
+    compact:    { pad: "px-2.5 py-2", typeSize: "text-[10px] px-1.5", idSize: "text-[11px]", titleClass: "text-[12px] leading-snug line-clamp-2 mb-1.5", metaSize: "text-[10px]", dotSize: "w-1 h-1" },
+    standard:   { pad: "px-3 py-2.5", typeSize: "text-[11px] px-1.5", idSize: "text-[12px]", titleClass: "text-[13px] leading-snug line-clamp-2 mb-1.5", metaSize: "text-[11px]", dotSize: "w-1.5 h-1.5" },
+    comfortable:{ pad: "px-3.5 py-3", typeSize: "text-[11px] px-1.5", idSize: "text-[12px]", titleClass: "text-[14px] leading-snug line-clamp-3 mb-2", metaSize: "text-[12px]", dotSize: "w-1.5 h-1.5" },
+  };
+  const ds = densityStyles[density];
+
   return (
     <div
-      className={`bg-surface-card rounded-[8px] px-3.5 py-3 cursor-pointer transition-all select-none border ${
+      className={`bg-surface-card rounded-[8px] cursor-pointer transition-all select-none border ${ds.pad} ${
         isSelected
           ? "border-primary ring-[3px] ring-primary/15"
           : isDimmed
@@ -66,17 +78,17 @@ export function KanbanCard({ item, rowType, stateColors, isSelected, isDimmed, o
       title={item.title}
     >
       {/* type tag + id + fix button */}
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-[11px] font-medium px-1.5 py-px rounded-full uppercase tracking-wider shrink-0"
+      <div className={`flex items-center ${density === "compact" ? "gap-1 mb-1.5" : "gap-1.5 mb-2"}`}>
+        <span className={`font-medium py-px rounded-full uppercase tracking-wider shrink-0 ${ds.typeSize}`}
           style={{ background: `${typeColor}18`, color: typeColor }}>
           {item.type || "?"}
         </span>
-        <span className="text-[12px] text-ink-muted tabular-nums">#{item.id}</span>
-        <FixButton item={item} onTriggerFix={onTriggerFix} />
+        <span className={`text-ink-muted tabular-nums ${ds.idSize}`}>#{item.id}</span>
+        {density !== "compact" && <FixButton item={item} onTriggerFix={onTriggerFix} />}
       </div>
 
       {/* Title */}
-      <div className="text-[14px] text-ink-body leading-snug line-clamp-3 mb-2">
+      <div className={`text-ink-body ${ds.titleClass}`}>
         {rowType === "new" && <span className="text-success font-medium">+ </span>}
         {rowType === "changed" && <span className="text-accent-amber font-medium">~ </span>}
         {rowType === "gone" && <span className="text-error">- </span>}
@@ -84,15 +96,16 @@ export function KanbanCard({ item, rowType, stateColors, isSelected, isDimmed, o
       </div>
 
       {/* Bottom: state dot + owner + date */}
-      <div className="flex items-center gap-2 text-[12px] text-ink-muted">
-        <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: sc }} />
+      <div className={`flex items-center gap-2 text-ink-muted ${ds.metaSize}`}>
+        <span className={`inline-block rounded-full shrink-0 ${ds.dotSize}`} style={{ backgroundColor: sc }} />
         <span className="truncate">{item.assignedTo || "Unassigned"}</span>
-        {item.createdDate && (
+        {density !== "compact" && item.createdDate && (
           <span className="tabular-nums ml-auto shrink-0">{item.createdDate.slice(0, 10)}</span>
         )}
       </div>
 
-      {rowType === "changed" && prev && (
+      {/* State transition — hidden in compact */}
+      {density !== "compact" && rowType === "changed" && prev && (
         <div className="mt-2 flex items-center gap-1 text-[11px]">
           <span className="line-through text-ink-soft">{prev}</span>
           <span className="text-ink-soft">&rarr;</span>

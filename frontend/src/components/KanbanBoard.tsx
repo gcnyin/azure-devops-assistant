@@ -17,9 +17,9 @@ interface KanbanBoardProps {
 
 function SkeletonBoard() {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 flex-1 min-h-0">
+    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin flex-1 min-h-0">
       {[1, 2, 3].map((col) => (
-        <div key={col} className="flex flex-col flex-1 min-w-[260px] max-w-[480px] border border-hairline rounded-[12px] overflow-hidden bg-canvas">
+        <div key={col} className="flex flex-col flex-1 min-w-[220px] max-w-[480px] border border-hairline rounded-[12px] overflow-hidden bg-canvas">
           <div className="px-3 py-2.5" style={{ background: "var(--color-surface-cream-strong)" }}>
             <Skeleton className="h-4 w-24" />
           </div>
@@ -101,7 +101,9 @@ export function KanbanBoard({
     (col) => col.items.length > 0 || col.state === "Done"
   );
 
-  const useMultiCol = visibleColumns.length <= 3;
+  // MultiCol: columns will decide individually via ResizeObserver,
+  // but we pass a base hint: enable grid when few columns or on smaller screens
+  const useMultiCol = visibleColumns.length <= 4;
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin flex-1 min-h-0">
