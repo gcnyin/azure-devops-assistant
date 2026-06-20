@@ -1,3 +1,4 @@
+import { Bell, BellOff } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { NotifyCategory, CategoryToggles } from "@/hooks/useBrowserNotification";
 
@@ -64,21 +65,10 @@ export function NotificationPopover({
       return <span className="text-ink-soft text-sm">-</span>;
     }
     if (permission === "denied") {
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          <line x1="2" y1="2" x2="22" y2="22"/>
-        </svg>
-      );
+      return <BellOff size={16} className="text-ink-muted" />;
     }
     // granted -- normal bell, always same look (open/closed state is inside panel)
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-      </svg>
-    );
+    return <Bell size={16} className="text-ink-muted" />;
   };
 
   const anyCategoryOff = !categories.new || !categories.changed || !categories.gone;

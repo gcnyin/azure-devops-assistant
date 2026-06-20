@@ -1,3 +1,4 @@
+import { X, Copy, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,7 +38,7 @@ export function RightPanel({ item, stateColors, onClose, onTriggerFix }: RightPa
           <span className="text-[14px] font-medium text-ink-strong truncate">{item.title}</span>
         </div>
         <button onClick={onClose} className="p-1 rounded-[8px] text-ink-muted hover:text-ink hover:bg-surface-card transition-colors shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          <X size={16} />
         </button>
       </div>
 
@@ -81,7 +82,7 @@ export function RightPanel({ item, stateColors, onClose, onTriggerFix }: RightPa
                 <div className="whitespace-pre-wrap leading-snug text-ink-body text-[14px] p-4 max-h-[500px] overflow-y-auto">{item.description}</div>
                 <button className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-[8px] bg-canvas border border-hairline text-ink-muted hover:text-ink transition-colors text-[12px]"
                   onClick={async () => { await navigator.clipboard.writeText(item.description); }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                  <Copy size={12} />
                   Copy
                 </button>
               </div>
@@ -89,7 +90,7 @@ export function RightPanel({ item, stateColors, onClose, onTriggerFix }: RightPa
             <a href={url} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-[8px] border border-hairline bg-surface-card text-ink-body text-[14px] font-medium hover:bg-surface-cream-strong hover:border-primary/30 hover:text-primary transition-colors">
               Open in Azure DevOps
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              <ExternalLink size={14} />
             </a>
           </>
         )}

@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import * as React from "react";
 
 interface AccordionContextValue {
@@ -73,12 +74,9 @@ export function AccordionTrigger({ children, isOpen, value }: AccordionTriggerPr
       onClick={() => ctx.onValueChange(open ? "" : itemValue)}
     >
       <span>{children}</span>
-      <svg
+      <ChevronDown
         className={`w-4 h-4 text-ink-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-      >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
+      />
     </button>
   );
 }

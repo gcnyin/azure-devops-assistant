@@ -1,3 +1,4 @@
+import { Search, X, List, User, Columns2, Table, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterDropdown } from "@/components/FilterDropdown";
@@ -86,16 +87,14 @@ export function BoardFilterBar({
         {/* Search — full width on small screens */}
         <div className="relative flex-1 min-w-[160px] sm:max-w-[320px]">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            <Search size={14} />
           </span>
           <Input ref={inputRef} className="pl-8 pr-8 h-8 text-[13px]" placeholder="Search by title, ID, or keyword..." value={localSearch}
             onChange={(e) => handleSearchChange(e.target.value)} onKeyDown={handleSearchKeyDown} />
           {localSearch && (
             <button className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink p-0.5 rounded"
               onClick={handleSearchClear}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              <X size={12} />
             </button>
           )}
         </div>
@@ -107,11 +106,7 @@ export function BoardFilterBar({
             selected={typeFilter?.toLowerCase() || null}
             onSelect={(k) => onTypeFilterChange(k)}
             placeholder="Type"
-            icon={
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
-                <path d="M4 7h16M4 12h16M4 17h10" />
-              </svg>
-            }
+            icon={<List size={12} className="opacity-60" />}
           />
         )}
 
@@ -124,11 +119,7 @@ export function BoardFilterBar({
             placeholder="Assigned"
             highlightKey={currentUser?.toLowerCase() || null}
             highlightTag="Me"
-            icon={
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-              </svg>
-            }
+            icon={<User size={12} className="opacity-60" />}
           />
         )}
 
@@ -165,36 +156,24 @@ export function BoardFilterBar({
         <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1 shrink-0">
           <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-1.5 sm:px-2 ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("kanban")} title="Kanban view">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="10" rx="1" /></svg>
+            <Columns2 size={14} />
             <span className="text-[12px] font-medium hidden sm:inline">看板</span>
           </button>
           <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-1.5 sm:px-2 ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("table")} title="Table view">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
+            <Table size={14} />
             <span className="text-[12px] font-medium hidden sm:inline">表格</span>
           </button>
         </div>
 
         {/* Export */}
         <Button variant="default" size="sm" onClick={onExport} title="Export CSV" className="shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
+          <Download size={14} />
         </Button>
 
         {/* Refresh */}
         <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh} title="Refresh" className="shrink-0">
-          {refreshPending ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-              <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-          )}
+          <RefreshCw size={14} className={refreshPending ? "animate-spin" : ""} />
         </Button>
 
         {/* Bulk fix */}

@@ -1,3 +1,4 @@
+import { Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -75,7 +76,7 @@ export function FixesView() {
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <div className="relative flex-1 min-w-[160px] max-w-[300px]">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <Search size={14} />
             </span>
             <Input className="pl-8 h-8 text-[13px]" placeholder="Search fixes..." value={q} onChange={e => setQ(e.target.value)} />
           </div>
@@ -130,7 +131,7 @@ export function FixesView() {
               <span className="text-[11px] text-ink-muted uppercase border border-hairline rounded-full px-1.5">{selectedFix.status}</span>
             </div>
             <button onClick={()=>setSelectedId(null)} className="p-1 rounded-[8px] text-ink-muted hover:text-ink hover:bg-surface-card transition-colors shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <X size={16} />
             </button>
           </div>
           <div className="px-4 py-2 border-b border-hairline shrink-0">

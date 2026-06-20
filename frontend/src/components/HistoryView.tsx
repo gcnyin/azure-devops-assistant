@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -89,7 +90,7 @@ export function HistoryView() {
               {cmpMode&&cmpSel.length===2?`Diff: #${diffA} vs #${diffB}`:snapDetail?`Snapshot #${selectedSnapId}`:"Snapshot"}
             </span>
             <button onClick={()=>{setSelectedSnapId(null);setCmpSel([]);}} className="p-1 rounded-[8px] text-ink-muted hover:text-ink hover:bg-surface-card transition-colors shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <X size={16} />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3 scrollbar-thin">
