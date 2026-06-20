@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { DiffInfo, DiffFilterType } from "@/types/api";
+import { useState, useRef, useEffect } from "react";
 
 interface BoardFilterBarProps {
   view: "all" | "me";
@@ -10,6 +11,9 @@ interface BoardFilterBarProps {
   availableTypes: { type: string; count: number }[];
   typeFilter: string | null;
   onTypeFilterChange: (t: string | null) => void;
+  availableAssignees: { name: string; count: number }[];
+  assigneeFilter: string | null;
+  onAssigneeFilterChange: (a: string | null) => void;
   diffInfo: DiffInfo | null;
   diffFilter: DiffFilterType | null;
   onDiffFilterChange: (f: DiffFilterType | null) => void;
@@ -36,6 +40,7 @@ const DEFAULT_TYPE_STYLE = { activeBg: "bg-ink-muted/10", activeText: "text-ink-
 export function BoardFilterBar({
   view, onViewChange, searchQuery, onSearchChange,
   availableTypes, typeFilter, onTypeFilterChange,
+  availableAssignees, assigneeFilter, onAssigneeFilterChange,
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
@@ -85,6 +90,15 @@ export function BoardFilterBar({
         );
       })}
 
+      {/* Assignee filter dropdown */}
+      {availableAssignees.length > 0 && (
+        <AssigneeDropdown
+          assignees={availableAssignees}
+          selected={assigneeFilter}
+          onSelect={onAssigneeFilterChange}
+        />
+      )}
+
       {/* Diff badges */}
       {nn > 0 && (
         <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
@@ -124,6 +138,105 @@ export function BoardFilterBar({
       <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh}>
         {refreshPending ? "Refreshing..." : "Refresh"}
       </Button>
+    </div>
+  );
+}
+
+/* ── Assignee searchable dropdown ── */
+
+function AssigneeDropdown({
+  assignees,
+  selected,
+  onSelect,
+}: {
+  assignees: { name: string; count: number }[];
+  selected: string | null;
+  onSelect: (a: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const filtered = filter
+    ? assignees.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()))
+    : assignees;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border flex items-center gap-1 ${
+          selected
+            ? "bg-primary/10 text-primary border-primary/30"
+            : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
+        }`}
+        onClick={() => { setOpen(!open); if (open) setFilter(""); }}
+      >
+        {selected ? (
+          <>
+            {selected}
+            <span
+              className="ml-0.5 text-[11px] opacity-60 hover:opacity-100 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}
+            >
+              &times;
+            </span>
+          </>
+        ) : (
+          "Assigned"
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-52 bg-canvas border border-hairline rounded-[12px] shadow-lg z-50 overflow-hidden">
+          <div className="p-1.5">
+            <input
+              type="text"
+              className="w-full px-2.5 py-1.5 text-[13px] bg-surface-card rounded-[8px] border-none outline-none text-ink placeholder:text-ink-muted"
+              placeholder="Search people..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto scrollbar-thin">
+            {/* All option */}
+            <button
+              className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${
+                !selected ? "text-primary font-medium" : "text-ink-muted"
+              }`}
+              onClick={() => { onSelect(null); setOpen(false); }}
+            >
+              Everyone
+            </button>
+            {filtered.map((a) => {
+              const isActive = selected?.toLowerCase() === a.name.toLowerCase();
+              return (
+                <button
+                  key={a.name}
+                  className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${
+                    isActive ? "text-primary font-medium" : "text-ink-muted"
+                  }`}
+                  onClick={() => { onSelect(a.name); setOpen(false); }}
+                >
+                  <span>{a.name}</span>
+                  <span className="ml-2 text-[11px] opacity-50">{a.count}</span>
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="px-3 py-4 text-[13px] text-ink-muted text-center">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

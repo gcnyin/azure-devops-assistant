@@ -28,11 +28,13 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const layoutParam = searchParams.get("layout") || "kanban";
   const selectedParam = searchParams.get("selected");
   const typeFilterParam = searchParams.get("type") || "";
+  const assigneeParam = searchParams.get("assigned") || "";
 
   const diffFilter: DiffFilterType | null =
     diffFilterParam === "new" || diffFilterParam === "changed" || diffFilterParam === "gone" ? diffFilterParam : null;
   const layoutMode = (layoutParam === "table" ? "table" : "kanban") as "kanban" | "table";
   const typeFilter = typeFilterParam || null;
+  const assigneeFilter = assigneeParam || null;
 
   const fixesMutation = useFixesMutation();
   const refreshMutation = useRefreshMutation();
@@ -60,7 +62,19 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
       .sort((a, b) => a.type.localeCompare(b.type));
   }, [allItems]);
 
-  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates, typeFilter);
+  const availableAssignees = useMemo(() => {
+    const nameMap: Record<string, number> = {};
+    for (const it of allItems) {
+      const n = (it.assignedTo || "").trim();
+      if (!n) { nameMap["Unassigned"] = (nameMap["Unassigned"] || 0) + 1; continue; }
+      nameMap[n] = (nameMap[n] || 0) + 1;
+    }
+    return Object.entries(nameMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [allItems]);
+
+  const filteredItems = useFilteredItems(allItems, diff, diffFilter, "all", searchQuery, incompleteStates, typeFilter, assigneeFilter);
 
   const selectedItem = useMemo(() => {
     if (!selectedParam) return null;
@@ -82,6 +96,9 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   }, [setSearchParams]);
   const handleTypeFilter = useCallback((t: string | null) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); t ? n.set("type", t) : n.delete("type"); return n; });
+  }, [setSearchParams]);
+  const handleAssigneeFilter = useCallback((a: string | null) => {
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); a ? n.set("assigned", a) : n.delete("assigned"); return n; });
   }, [setSearchParams]);
   const handleCardClick = useCallback((item: WorkItem) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("selected", String(item.id)); return n; });
@@ -124,6 +141,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
 
         <BoardFilterBar view={view} onViewChange={setView} searchQuery={searchQuery} onSearchChange={handleSearch}
           availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
+          availableAssignees={availableAssignees} assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
           diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
           layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
           onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
