@@ -91,7 +91,7 @@ class TestApiDataRoute:
         data = resp.get_json()
         assert data["iteration"]["name"] == "Sprint 1"
         assert len(data["items"]) == 2
-        assert data["items"][0]["id"] == 1
+        assert {it["id"] for it in data["items"]} == {1, 2}
         assert data["assigned_to"] == "张三"
         assert data["team_name"] == "DevTeam"
         assert data["project"] == "MyProject"
