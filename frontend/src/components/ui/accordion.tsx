@@ -23,7 +23,7 @@ interface AccordionProps {
 export function Accordion({ value, onValueChange, children }: AccordionProps) {
   return (
     <AccordionContext.Provider value={{ value, onValueChange }}>
-      <div className="flex flex-col gap-3">{children}</div>
+      <div className="border border-hairline rounded-xl overflow-hidden divide-y divide-hairline">{children}</div>
     </AccordionContext.Provider>
   );
 }
@@ -39,8 +39,8 @@ export function AccordionItem({ value, children }: AccordionItemProps) {
 
   return (
     <div
-      className={`border rounded-xl overflow-hidden transition-colors ${
-        isOpen ? "border-hairline-soft bg-canvas-card" : "border-hairline bg-canvas-soft hover:border-hairline-soft"
+      className={`transition-colors ${
+        isOpen ? "bg-surface-soft" : "hover:bg-surface-soft/50"
       }`}
     >
       {React.Children.map(children, (child) => {
@@ -67,7 +67,9 @@ export function AccordionTrigger({ children, isOpen, value }: AccordionTriggerPr
   return (
     <button
       type="button"
-      className="flex items-center justify-between w-full px-5 py-3.5 text-left text-sm font-medium text-ink-strong hover:text-ink cursor-pointer transition-colors"
+      className={`flex items-center justify-between w-full px-5 py-3.5 text-left text-sm font-medium cursor-pointer transition-colors ${
+        open ? "text-ink bg-surface-card" : "text-ink-strong hover:text-ink"
+      }`}
       onClick={() => ctx.onValueChange(open ? "" : itemValue)}
     >
       <span>{children}</span>
@@ -95,7 +97,7 @@ export function AccordionContent({ children, isOpen }: AccordionContentProps) {
         open ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
       }`}
     >
-      <div className="px-5 pb-5">{children}</div>
+      <div className="px-5 pt-3 pb-5">{children}</div>
     </div>
   );
 }

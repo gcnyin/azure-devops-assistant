@@ -37,8 +37,8 @@ export function HistoryView() {
   const isPanelOpen = selectedSnapId !== null || (cmpMode && cmpSel.length === 2);
 
   return (
-    <div className="flex gap-0 h-full min-h-0">
-      <div className="flex flex-col min-w-0" style={isPanelOpen ? { width: "calc(100% - 480px)", maxWidth: "calc(100% - 480px)" } : { flex: 1 }}>
+    <div className="flex gap-4 h-full min-h-0">
+      <div className="flex flex-col min-w-0" style={isPanelOpen ? { width: "calc(100% - 496px)", maxWidth: "calc(100% - 496px)" } : { flex: 1 }}>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {cmpMode ? (<>
             <span className="text-[13px] text-ink-muted">Compare mode: select 2 snapshots</span>

@@ -70,8 +70,8 @@ export function FixesView() {
   const effectiveOpen = openGroup !== null ? openGroup : Object.keys(grouped).find(k => grouped[k].length > 0) || "";
 
   return (
-    <div className="flex gap-0 h-full min-h-0">
-      <div className="flex flex-col min-w-0" style={selectedFix ? { width: "calc(100% - 480px)", maxWidth: "calc(100% - 480px)" } : { flex: 1 }}>
+    <div className="flex gap-4 h-full min-h-0">
+      <div className="flex flex-col min-w-0" style={selectedFix ? { width: "calc(100% - 496px)", maxWidth: "calc(100% - 496px)" } : { flex: 1 }}>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <div className="relative flex-1 min-w-[160px] max-w-[300px]">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">

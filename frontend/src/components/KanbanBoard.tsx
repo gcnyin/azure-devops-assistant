@@ -19,11 +19,11 @@ function SkeletonBoard() {
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 flex-1 min-h-0">
       {[1, 2, 3].map((col) => (
-        <div key={col} className="flex flex-col flex-1 min-w-[260px] max-w-[480px]">
-          <div className="px-3 py-2.5 rounded-t-[12px]" style={{ background: "var(--color-surface-cream-strong)" }}>
+        <div key={col} className="flex flex-col flex-1 min-w-[260px] max-w-[480px] border border-hairline rounded-[12px] overflow-hidden bg-canvas">
+          <div className="px-3 py-2.5" style={{ background: "var(--color-surface-cream-strong)" }}>
             <Skeleton className="h-4 w-24" />
           </div>
-          <div className="flex-1 px-2 py-2 space-y-2">
+          <div className="flex-1 px-3 py-3 space-y-2">
             {[1, 2, 3, 4, 5].map((card) => (
               <div key={card} className="bg-surface-card rounded-[8px] px-3.5 py-3 space-y-2.5">
                 <div className="flex items-center gap-2">
