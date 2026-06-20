@@ -136,7 +136,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const dimmedItemIds = useMemo(() => {
     if (!searchQuery) return new Set<number>();
     const q = searchQuery.toLowerCase();
-    const matching = allItems.filter((it) => String(it.id).includes(q) || (it.title||"").toLowerCase().includes(q) || (it.assignedTo||"").toLowerCase().includes(q) || (it.state||"").toLowerCase().includes(q));
+    const matching = allItems.filter((it) => String(it.id).includes(q) || (it.title||"").toLowerCase().includes(q) || (it.assignedTo||"").toLowerCase().includes(q) || (it.type||"").toLowerCase().includes(q) || (it.description||"").toLowerCase().includes(q) || (it.state||"").toLowerCase().includes(q));
     const mid = new Set(matching.map((i) => i.id)), dim = new Set<number>();
     for (const it of allItems) if (!mid.has(it.id)) dim.add(it.id);
     return dim;
