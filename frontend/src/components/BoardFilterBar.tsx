@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FilterDropdown } from "@/components/FilterDropdown";
 import type { DiffInfo, DiffFilterType } from "@/types/api";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface BoardFilterBarProps {
   searchQuery: string;
@@ -23,17 +24,10 @@ interface BoardFilterBarProps {
   checkedBugCount: number;
   onBulkFix: () => void;
   bulkFixPending: boolean;
+  totalCount: number;
+  openCount: number;
+  doneCount: number;
 }
-
-const TYPE_STYLES: Record<string, { activeBg: string; activeText: string; activeBorder: string }> = {
-  bug:    { activeBg: "bg-error/10",    activeText: "text-error",       activeBorder: "border-error/30" },
-  task:   { activeBg: "bg-accent-amber/10", activeText: "text-accent-amber", activeBorder: "border-accent-amber/30" },
-  "user story": { activeBg: "bg-accent-teal/10", activeText: "text-accent-teal", activeBorder: "border-accent-teal/30" },
-  feature:{ activeBg: "bg-primary/10",  activeText: "text-primary",     activeBorder: "border-primary/30" },
-  epic:   { activeBg: "bg-fuchsia-700/10", activeText: "text-fuchsia-600", activeBorder: "border-fuchsia-600/30" },
-  issue:  { activeBg: "bg-error/10",    activeText: "text-error",       activeBorder: "border-error/30" },
-};
-const DEFAULT_TYPE_STYLE = { activeBg: "bg-ink-muted/10", activeText: "text-ink-muted", activeBorder: "border-ink-muted/30" };
 
 export function BoardFilterBar({
   searchQuery, onSearchChange,
@@ -43,14 +37,50 @@ export function BoardFilterBar({
   diffInfo, diffFilter, onDiffFilterChange,
   layoutMode, onLayoutChange, onRefresh, refreshPending,
   checkedBugCount, onBulkFix, bulkFixPending,
+  totalCount, openCount, doneCount,
 }: BoardFilterBarProps) {
+  // ── Debounced search ──
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => onSearchChange(value), 300);
+  };
+
+  const handleSearchClear = () => {
+    setLocalSearch("");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onSearchChange("");
+    inputRef.current?.focus();
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      if (localSearch) {
+        handleSearchClear();
+      } else {
+        inputRef.current?.blur();
+      }
+    }
+  };
+
   const nn = diffInfo?.new_items?.length || 0;
   const nc = diffInfo?.continuing_items?.filter((it) => it._state_changed).length || 0;
   const ng = diffInfo?.gone_items?.length || 0;
 
+  // ── Type dropdown items ──
+  const typeItems = availableTypes.map((t) => ({ key: t.type.toLowerCase(), label: t.type, count: t.count }));
+  const assigneeItems = availableAssignees.map((a) => ({ key: a.name.toLowerCase(), label: a.name, count: a.count }));
+
   return (
     <div className="space-y-2 pb-2">
-      {/* ═══ Row 1: Filters ═══ */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Search */}
         <div className="relative flex-1 min-w-[180px] max-w-[320px]">
@@ -59,71 +89,104 @@ export function BoardFilterBar({
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </span>
-          <Input className="pl-8 h-8 text-[13px]" placeholder="Search by title, ID, or keyword..." value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)} />
+          <Input ref={inputRef} className="pl-8 pr-8 h-8 text-[13px]" placeholder="Search by title, ID, or keyword..." value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)} onKeyDown={handleSearchKeyDown} />
+          {localSearch && (
+            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink p-0.5 rounded"
+              onClick={handleSearchClear}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          )}
         </div>
 
-        {/* Type pills */}
-        {availableTypes.map((t) => {
-          const isActive = typeFilter?.toLowerCase() === t.type.toLowerCase();
-          const style = TYPE_STYLES[t.type.toLowerCase()] || DEFAULT_TYPE_STYLE;
-          return (
-            <button key={t.type}
-              className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border ${
-                isActive ? `${style.activeBg} ${style.activeText} ${style.activeBorder}` : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
-              }`}
-              onClick={() => onTypeFilterChange(isActive ? null : t.type)}>
-              {t.type}<span className="ml-1 opacity-60 text-[11px]">{t.count}</span>
-            </button>
-          );
-        })}
+        {/* Type dropdown */}
+        {availableTypes.length > 0 && (
+          <FilterDropdown
+            items={typeItems}
+            selected={typeFilter?.toLowerCase() || null}
+            onSelect={(k) => onTypeFilterChange(k)}
+            placeholder="Type"
+            icon={
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
+                <path d="M4 7h16M4 12h16M4 17h10" />
+              </svg>
+            }
+          />
+        )}
 
         {/* Assignee dropdown */}
         {availableAssignees.length > 0 && (
-          <AssigneeDropdown
-            assignees={availableAssignees}
-            currentUser={currentUser}
-            selected={assigneeFilter}
-            onSelect={onAssigneeFilterChange}
+          <FilterDropdown
+            items={assigneeItems}
+            selected={assigneeFilter?.toLowerCase() || null}
+            onSelect={(k) => onAssigneeFilterChange(k)}
+            placeholder="Assigned"
+            highlightKey={currentUser?.toLowerCase() || null}
+            highlightTag="Me"
+            icon={
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+            }
           />
         )}
 
         {/* Diff badges */}
-        <span className="text-hairline select-none mx-1">|</span>
-        {nn > 0 && (
-          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
-            onClick={() => onDiffFilterChange(diffFilter === "new" ? null : "new")}>+{nn} New</span>
+        {(nn > 0 || nc > 0 || ng > 0) && (
+          <>
+            <span className="text-hairline select-none mx-0.5">|</span>
+            {nn > 0 && (
+              <span className={`diff-tag cursor-pointer select-none ${diffFilter === "new" ? "diff-tag active-new" : ""}`}
+                onClick={() => onDiffFilterChange(diffFilter === "new" ? null : "new")}>+{nn} New</span>
+            )}
+            {nc > 0 && (
+              <span className={`diff-tag cursor-pointer select-none ${diffFilter === "changed" ? "diff-tag active-changed" : ""}`}
+                onClick={() => onDiffFilterChange(diffFilter === "changed" ? null : "changed")}>~{nc} Changed</span>
+            )}
+            {ng > 0 && (
+              <span className={`diff-tag cursor-pointer select-none ${diffFilter === "gone" ? "diff-tag active-gone" : ""}`}
+                onClick={() => onDiffFilterChange(diffFilter === "gone" ? null : "gone")}>-{ng} Gone</span>
+            )}
+          </>
         )}
-        {nc > 0 && (
-          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "changed" ? "diff-tag active-changed" : ""}`}
-            onClick={() => onDiffFilterChange(diffFilter === "changed" ? null : "changed")}>~{nc} Changed</span>
-        )}
-        {ng > 0 && (
-          <span className={`diff-tag cursor-pointer select-none ${diffFilter === "gone" ? "diff-tag active-gone" : ""}`}
-            onClick={() => onDiffFilterChange(diffFilter === "gone" ? null : "gone")}>-{ng} Gone</span>
-        )}
-      </div>
 
-      {/* ═══ Row 2: Actions ═══ */}
-      <div className="flex items-center gap-2 flex-wrap">
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Stats */}
+        <div className="flex items-center gap-3 text-[13px] tabular-nums shrink-0">
+          <span><span className="font-medium text-ink">{totalCount}</span> <span className="text-ink-muted">Total</span></span>
+          <span><span className="font-medium text-accent-amber">{openCount}</span> <span className="text-ink-muted">Open</span></span>
+          <span><span className="font-medium text-success">{doneCount}</span> <span className="text-ink-muted">Done</span></span>
+        </div>
+
         {/* Layout toggle */}
+        <span className="text-hairline select-none mx-0.5">|</span>
         <div className="flex items-center gap-0.5 bg-surface-card rounded-[8px] p-1">
-          <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-2 ${layoutMode === "kanban" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("kanban")} title="Kanban view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="10" rx="1" /></svg>
+            <span className="text-[12px] font-medium">看板</span>
           </button>
-          <button className={`p-1 rounded-[6px] transition-colors ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+          <button className={`p-1 rounded-[6px] transition-colors flex items-center gap-1 px-2 ${layoutMode === "table" ? "bg-canvas text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
             onClick={() => onLayoutChange("table")} title="Table view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
+            <span className="text-[12px] font-medium">表格</span>
           </button>
         </div>
 
         {/* Refresh */}
-        <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh}>
-          {refreshPending ? "Refreshing..." : "Refresh"}
+        <Button variant="default" size="sm" disabled={refreshPending} onClick={onRefresh} title="Refresh">
+          {refreshPending ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+              <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          )}
         </Button>
-
-        <div className="flex-1" />
 
         {/* Bulk fix */}
         {checkedBugCount > 0 && (
@@ -132,100 +195,6 @@ export function BoardFilterBar({
           </Button>
         )}
       </div>
-    </div>
-  );
-}
-
-/* ── Assignee searchable dropdown ── */
-
-function AssigneeDropdown({
-  assignees, currentUser, selected, onSelect,
-}: {
-  assignees: { name: string; count: number }[];
-  currentUser: string;
-  selected: string | null;
-  onSelect: (a: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const filtered = filter
-    ? assignees.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()))
-    : assignees;
-
-  const isMe = (name: string) => currentUser && name.toLowerCase() === currentUser.toLowerCase();
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        className={`px-2.5 py-1 rounded-full text-[13px] font-medium transition-colors border flex items-center gap-1 ${
-          selected
-            ? "bg-primary/10 text-primary border-primary/30"
-            : "text-ink-muted border-hairline hover:text-ink hover:border-hairline-soft"
-        }`}
-        onClick={() => { setOpen(!open); if (open) setFilter(""); }}
-      >
-        {selected ? (
-          <>
-            {selected}
-            <span className="ml-0.5 text-[11px] opacity-60 hover:opacity-100 cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}>
-              &times;
-            </span>
-          </>
-        ) : (
-          <>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-            </svg>
-            Assigned
-          </>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-52 bg-canvas border border-hairline rounded-[12px] shadow-lg z-50 overflow-hidden">
-          <div className="p-1.5">
-            <input type="text"
-              className="w-full px-2.5 py-1.5 text-[13px] bg-surface-card rounded-[8px] border-none outline-none text-ink placeholder:text-ink-muted"
-              placeholder="Search people..." value={filter}
-              onChange={(e) => setFilter(e.target.value)} autoFocus />
-          </div>
-          <div className="max-h-52 overflow-y-auto scrollbar-thin">
-            <button className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card ${!selected ? "text-primary font-medium" : "text-ink-muted"}`}
-              onClick={() => { onSelect(null); setOpen(false); }}>
-              Everyone
-            </button>
-            {filtered.map((a) => {
-              const isActive = selected?.toLowerCase() === a.name.toLowerCase();
-              const isCurrentUser = isMe(a.name);
-              return (
-                <button key={a.name}
-                  className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-surface-card flex items-center gap-2 ${
-                    isActive ? "text-primary font-medium" : "text-ink-muted"
-                  }`}
-                  onClick={() => { onSelect(a.name); setOpen(false); }}>
-                  <span>{a.name}</span>
-                  {isCurrentUser && <span className="text-[10px] bg-primary/10 text-primary px-1 py-px rounded-full font-medium">Me</span>}
-                  <span className="ml-auto text-[11px] opacity-50">{a.count}</span>
-                </button>
-              );
-            })}
-            {filtered.length === 0 && (
-              <div className="px-3 py-4 text-[13px] text-ink-muted text-center">No matches</div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

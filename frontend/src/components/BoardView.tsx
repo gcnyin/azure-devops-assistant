@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { WorkItemsTable } from "@/components/WorkItemsTable";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { BoardFilterBar } from "@/components/BoardFilterBar";
-import { RightPanel } from "@/components/RightPanel";
+import { DetailModal } from "@/components/DetailModal";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useFixesMutation, useRefreshMutation } from "@/hooks/useApi";
 import { useFilteredItems } from "@/hooks/useFilteredItems";
@@ -78,6 +78,16 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     return isNaN(id) ? null : allItems.find((it) => it.id === id) || null;
   }, [selectedParam, allItems]);
 
+  // Stats
+  const incompleteSet = useMemo(() => new Set(incompleteStates.map((s) => s.toLowerCase())), [incompleteStates]);
+  const { totalCount, openCount, doneCount } = useMemo(() => {
+    let open = 0, done = 0;
+    for (const it of allItems) {
+      if (incompleteSet.has(it.state.toLowerCase())) open++; else done++;
+    }
+    return { totalCount: allItems.length, openCount: open, doneCount: done };
+  }, [allItems, incompleteSet]);
+
   const handleSearch = useCallback((value: string) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); value ? n.set("q", value) : n.delete("q"); return n; });
   }, [setSearchParams]);
@@ -96,7 +106,7 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
   const handleCardClick = useCallback((item: WorkItem) => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("selected", String(item.id)); return n; });
   }, [setSearchParams]);
-  const handleClosePanel = useCallback(() => {
+  const handleCloseModal = useCallback(() => {
     setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete("selected"); return n; });
   }, [setSearchParams]);
 
@@ -124,50 +134,58 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     return dim;
   }, [searchQuery, allItems]);
 
-  const isPanelOpen = selectedItem !== null;
+  const isLoading = !data && !isError;
 
   return (
-    <div className="flex gap-0 h-full min-h-0">
-      <div className="flex-1 flex flex-col min-w-0" style={isPanelOpen ? { maxWidth: "calc(100% - 480px)" } : undefined}>
-        {data?.error && <ErrorBanner message={data.error} />}
-        {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load"} />}
+    <div className="flex flex-col h-full min-h-0">
+      {data?.error && <ErrorBanner message={data.error} />}
+      {isError && !data?.error && <ErrorBanner message={error?.message || "Failed to load"} />}
 
-        <BoardFilterBar
-          searchQuery={searchQuery} onSearchChange={handleSearch}
-          availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
-          availableAssignees={availableAssignees} currentUser={currentUser}
-          assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
-          diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
-          layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
-          onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
-          checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending}
-        />
+      <BoardFilterBar
+        searchQuery={searchQuery} onSearchChange={handleSearch}
+        availableTypes={availableTypes} typeFilter={typeFilter} onTypeFilterChange={handleTypeFilter}
+        availableAssignees={availableAssignees} currentUser={currentUser}
+        assigneeFilter={assigneeFilter} onAssigneeFilterChange={handleAssigneeFilter}
+        diffInfo={diff} diffFilter={diffFilter} onDiffFilterChange={handleDiffFilter}
+        layoutMode={layoutMode} onLayoutChange={handleLayoutChange}
+        onRefresh={handleRefresh} refreshPending={refreshMutation.isPending}
+        checkedBugCount={checkedBugIds.size} onBulkFix={handleBulkFix} bulkFixPending={fixesMutation.isPending}
+        totalCount={totalCount} openCount={openCount} doneCount={doneCount}
+      />
 
-        <div className="flex-1 min-h-0">
-          {filteredItems.length === 0 && !data && !isError ? (
-            <div className="flex items-center justify-center h-64 text-ink-muted text-[14px]">Loading...</div>
-          ) : filteredItems.length === 0 && data ? (
-            <div className="flex flex-col items-center justify-center h-64 text-ink-muted">
-              <div className="text-4xl mb-3 opacity-60">-</div>
-              <div className="text-[14px] font-medium text-ink-strong mb-1">No results</div>
-              <div className="text-[13px] text-ink-soft">{searchQuery ? `No items match "${searchQuery}"` : "No work items in this sprint."}</div>
-            </div>
-          ) : layoutMode === "kanban" ? (
-            <KanbanBoard items={filteredItems} incompleteStates={incompleteStates} stateColors={stateColors}
-              diffFilter={diffFilter} selectedItemId={selectedItem?.id ?? null}
-              dimmedItemIds={searchQuery ? dimmedItemIds : new Set()}
-              onCardClick={handleCardClick} onTriggerFix={handleTriggerFix} />
-          ) : (
-            <div className="table-wrap">
-              <WorkItemsTable items={filteredItems} rowType={diffFilter || undefined} onRowClick={handleCardClick}
-                stateColors={stateColors} showFixColumn onTriggerFix={handleTriggerFix}
-                onViewFix={(bugId) => navigate(`/fixes?bug_id=${bugId}`)}
-                checkedBugIds={checkedBugIds} onToggleBugCheck={toggleBugCheck} />
-            </div>
-          )}
-        </div>
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <KanbanBoard items={[]} incompleteStates={incompleteStates} stateColors={stateColors}
+            diffFilter={null} selectedItemId={null} dimmedItemIds={new Set()}
+            onCardClick={() => {}} isLoading={true} />
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-ink-muted">
+            <div className="text-4xl mb-3 opacity-60">-</div>
+            <div className="text-[14px] font-medium text-ink-strong mb-1">No results</div>
+            <div className="text-[13px] text-ink-soft">{searchQuery ? `No items match "${searchQuery}"` : "No work items in this sprint."}</div>
+          </div>
+        ) : layoutMode === "kanban" ? (
+          <KanbanBoard items={filteredItems} incompleteStates={incompleteStates} stateColors={stateColors}
+            diffFilter={diffFilter} selectedItemId={selectedItem?.id ?? null}
+            dimmedItemIds={searchQuery ? dimmedItemIds : new Set()}
+            onCardClick={handleCardClick} onTriggerFix={handleTriggerFix} />
+        ) : (
+          <div className="table-wrap">
+            <WorkItemsTable items={filteredItems} rowType={diffFilter || undefined} onRowClick={handleCardClick}
+              stateColors={stateColors} showFixColumn onTriggerFix={handleTriggerFix}
+              onViewFix={(bugId) => navigate(`/fixes?bug_id=${bugId}`)}
+              checkedBugIds={checkedBugIds} onToggleBugCheck={toggleBugCheck} />
+          </div>
+        )}
       </div>
-      {isPanelOpen && <RightPanel item={selectedItem} stateColors={stateColors} onClose={handleClosePanel} onTriggerFix={handleTriggerFix} />}
+
+      <DetailModal
+        item={selectedItem}
+        stateColors={stateColors}
+        onClose={handleCloseModal}
+        onTriggerFix={handleTriggerFix}
+        showFixesTab
+      />
     </div>
   );
 }

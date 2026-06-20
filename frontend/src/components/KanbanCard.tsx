@@ -20,23 +20,28 @@ function getTypeColor(type: string): string {
   return TYPE_COLORS[type.toLowerCase()] || "#6c6a64";
 }
 
-function FixDot({ item, onTriggerFix }: { item: WorkItem; onTriggerFix?: (bugId: number) => void }) {
+function FixButton({ item, onTriggerFix }: { item: WorkItem; onTriggerFix?: (bugId: number) => void }) {
   const isBug = (item.type || "").toLowerCase() === "bug";
   if (!isBug || !onTriggerFix) return null;
   const status = item.fix_status;
-  const dotClass = !status
-    ? "border border-dashed border-ink-muted/40 bg-transparent"
-    : status === "pending" ? "bg-ink-muted/40"
-    : status === "running" ? "bg-accent-amber animate-pulse"
-    : status === "completed" ? "bg-success"
-    : "bg-error";
+  const iconClass = !status
+    ? "text-ink-muted/60 hover:text-primary"
+    : status === "pending" ? "text-ink-muted/40"
+    : status === "running" ? "text-accent-amber animate-pulse"
+    : status === "completed" ? "text-success"
+    : "text-error";
+
+  const tooltip = !status ? "AI Fix" : status === "completed" ? "View fix" : status === "failed" ? "Retry fix" : `Fix ${status}`;
 
   return (
     <button
       className="ml-auto shrink-0 p-1 -mr-1 rounded hover:bg-surface-soft transition-colors"
       onClick={(e) => { e.stopPropagation(); onTriggerFix(item.id); }}
+      title={tooltip}
     >
-      <span className={`inline-block w-2 h-2 rounded-full ${dotClass}`} />
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={iconClass}>
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+      </svg>
     </button>
   );
 }
@@ -48,7 +53,7 @@ export function KanbanCard({ item, rowType, stateColors, isSelected, isDimmed, o
 
   return (
     <div
-      className={`bg-surface-card rounded-[12px] px-3.5 py-3 cursor-pointer transition-all select-none border ${
+      className={`bg-surface-card rounded-[8px] px-3.5 py-3 cursor-pointer transition-all select-none border ${
         isSelected
           ? "border-primary ring-[3px] ring-primary/15"
           : isDimmed
@@ -58,15 +63,16 @@ export function KanbanCard({ item, rowType, stateColors, isSelected, isDimmed, o
         rowType === "changed" ? "shadow-[inset_3px_0_0_0_var(--color-accent-amber)]" : ""}${
         rowType === "gone" ? "opacity-55" : ""}`}
       onClick={onClick}
+      title={item.title}
     >
-      {/* type tag + id + fix dot */}
+      {/* type tag + id + fix button */}
       <div className="flex items-center gap-1.5 mb-2">
         <span className="text-[11px] font-medium px-1.5 py-px rounded-full uppercase tracking-wider shrink-0"
           style={{ background: `${typeColor}18`, color: typeColor }}>
           {item.type || "?"}
         </span>
         <span className="text-[12px] text-ink-muted tabular-nums">#{item.id}</span>
-        <FixDot item={item} onTriggerFix={onTriggerFix} />
+        <FixButton item={item} onTriggerFix={onTriggerFix} />
       </div>
 
       {/* Title */}

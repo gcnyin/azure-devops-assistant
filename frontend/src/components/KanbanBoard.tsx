@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { KanbanColumn } from "@/components/KanbanColumn";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { WorkItem, DiffFilterType } from "@/types/api";
 
 interface KanbanBoardProps {
@@ -11,11 +12,44 @@ interface KanbanBoardProps {
   dimmedItemIds: Set<number>;
   onCardClick: (item: WorkItem) => void;
   onTriggerFix?: (bugId: number) => void;
+  isLoading?: boolean;
+}
+
+function SkeletonBoard() {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-3 flex-1 min-h-0">
+      {[1, 2, 3].map((col) => (
+        <div key={col} className="flex flex-col flex-1 min-w-[260px] max-w-[480px]">
+          <div className="px-3 py-2.5 rounded-t-[12px]" style={{ background: "var(--color-surface-cream-strong)" }}>
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="flex-1 px-2 py-2 space-y-2">
+            {[1, 2, 3, 4, 5].map((card) => (
+              <div key={card} className="bg-surface-card rounded-[8px] px-3.5 py-3 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-10 rounded-full" />
+                  <Skeleton className="h-3 w-8" />
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <div className="flex items-center gap-2 pt-1">
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-3 w-14 ml-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function KanbanBoard({
   items, incompleteStates, stateColors, diffFilter,
   selectedItemId, dimmedItemIds, onCardClick, onTriggerFix,
+  isLoading,
 }: KanbanBoardProps) {
   const columns = useMemo(() => {
     const grouped: Record<string, WorkItem[]> = {};
@@ -60,6 +94,8 @@ export function KanbanBoard({
     return ordered;
   }, [items, incompleteStates]);
 
+  if (isLoading) return <SkeletonBoard />;
+
   // Filter: hide empty columns except Done (anchor column)
   const visibleColumns = columns.filter(
     (col) => col.items.length > 0 || col.state === "Done"
@@ -68,7 +104,7 @@ export function KanbanBoard({
   const useMultiCol = visibleColumns.length <= 3;
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin" style={{ minHeight: "calc(100vh - 220px)" }}>
+    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-thin flex-1 min-h-0">
       {visibleColumns.map((col) => (
         <KanbanColumn
           key={col.state} state={col.state} items={col.items} stateColors={stateColors}
@@ -76,11 +112,6 @@ export function KanbanBoard({
           dimmedItemIds={dimmedItemIds} onCardClick={onCardClick} onTriggerFix={onTriggerFix}
         />
       ))}
-      {visibleColumns.length === 0 && (
-        <div className="flex items-center justify-center w-full text-ink-muted text-[14px]">
-          No work items found
-        </div>
-      )}
     </div>
   );
 }
