@@ -139,6 +139,17 @@ export interface SettingsData {
   ai_provider: string;
 }
 
+export interface AgentInfo {
+  name: string;
+  available: boolean;
+  description: string;
+}
+
+export interface AgentsResponse {
+  agents: AgentInfo[];
+  error?: string;
+}
+
 export interface SaveSettingsResult {
   ok: boolean;
   config?: SettingsData;

@@ -144,6 +144,14 @@ export function useSettings() {
   });
 }
 
+export function useAgents() {
+  return useQuery<{ agents: { name: string; available: boolean; description: string }[] }>({
+    queryKey: ["agents"],
+    queryFn: () => fetchJson("/api/agents"),
+    staleTime: 30_000,
+  });
+}
+
 export function useSaveSettings() {
   const queryClient = useQueryClient();
 

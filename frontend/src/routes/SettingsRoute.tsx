@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { useSettings, useSaveSettings } from "@/hooks/useApi";
+import { useAgents, useSettings, useSaveSettings } from "@/hooks/useApi";
 import type { SettingsData } from "@/types/api";
 
 type SectionKey = "azure" | "query" | "ai" | "provider";
@@ -30,7 +30,7 @@ const SECTIONS: Record<SectionKey, { description: string; fields: FieldDef[] }> 
     { key: "target_branch", label: "Target Branch", placeholder: "develop", hint: "PR merge target branch" },
   ]},
   provider: { description: "AI Agent used for auto-fix. Applies immediately.", fields: [
-    { key: "ai_provider", label: "AI Agent", placeholder: "auto / pi / claude / opencode / codex", hint: "auto = detect available agent" },
+    { key: "ai_provider", label: "AI Agent", hint: "auto = detect available agent; unavailable agents are grayed out" },
   ]},
 };
 
@@ -38,6 +38,7 @@ function isMaskedValue(v: string): boolean { return v.includes("*") && v.length 
 
 export default function SettingsRoute() {
   const { data: settings, isLoading, error } = useSettings();
+  const { data: agentsData } = useAgents();
   const saveMutation = useSaveSettings();
   const [form, setForm] = useState<SettingsData | null>(null);
   const [editedSensitive, setEditedSensitive] = useState<Set<string>>(new Set());
@@ -96,6 +97,37 @@ export default function SettingsRoute() {
     const isEditingSensitive = editedSensitive.has(field.key), fieldError = errors[field.key];
     let display = val;
     if (isSensitive && !isEditingSensitive && isMaskedValue(val)) display = val;
+    
+    // AI Agent 下拉选择器
+    if (field.key === "ai_provider") {
+      const agents = agentsData?.agents || [];
+      const hasData = agents.length > 0;
+      return (
+        <div key={field.key} className="flex flex-col gap-1">
+          <label className="text-[13px] font-medium text-ink">{field.label}</label>
+          <select
+            value={val}
+            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            className="flex h-8 w-full rounded-[10px] border border-hairline bg-canvas px-3 py-1 text-[13px] text-ink shadow-none transition-colors file:border-0 file:bg-transparent file:text-[13px] file:font-medium placeholder:text-ink-muted focus-visible:outline-none focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="auto">auto (auto-detect)</option>
+            {hasData ? agents.map((a) => (
+              <option key={a.name} value={a.name} disabled={!a.available}>
+                {a.name}{a.available ? "" : " (not installed)"}
+              </option>
+            )) : (
+              <>
+                <option value="pi">pi</option>
+                <option value="claude">claude</option>
+                <option value="opencode">opencode</option>
+                <option value="codex">codex</option>
+              </>
+            )}
+          </select>
+          {field.hint && <p className="text-[11px] text-ink-soft">{field.hint}</p>}
+        </div>
+      );
+    }
     return (
       <div key={field.key} className="flex flex-col gap-1">
         <label className="text-[13px] font-medium text-ink flex items-center gap-2">

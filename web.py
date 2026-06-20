@@ -21,7 +21,7 @@ from db import (
     save_snapshot,
     load_all_config, save_config,
 )
-from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir
+from ai_fix import enqueue_fix_tasks, set_work_dir as ai_set_work_dir, get_available_agents
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -662,6 +662,17 @@ def api_settings_save():
     except Exception as e:
         logger.error("保存配置失败: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/agents")
+def api_agents():
+    """返回系统已安装的 AI agent 列表。"""
+    try:
+        agents = get_available_agents()
+        return jsonify({"agents": agents})
+    except Exception as e:
+        logger.error("获取 agent 列表失败: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/history/<int:snapshot_id>")

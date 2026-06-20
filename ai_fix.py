@@ -53,6 +53,31 @@ def set_ai_provider(provider: str):
     _ai_provider = provider.strip().lower() if provider else "auto"
 
 
+def get_available_agents() -> list[dict[str, str | bool]]:
+    """返回所有已知 AI agent 及其可用性。
+
+    Returns:
+        [{name, available, description}, ...]
+        - name: agent 名称，用于配置 ai_provider
+        - available: 当前系统 PATH 中是否可执行
+        - description: 一段简短的中文描述
+    """
+    agents = [
+        ("pi", "pi coding agent — 本项目的默认 agent"),
+        ("claude", "Anthropic Claude Code CLI"),
+        ("opencode", "OpenCode CLI"),
+        ("codex", "OpenAI Codex CLI"),
+    ]
+    result = []
+    for name, desc in agents:
+        result.append({
+            "name": name,
+            "available": shutil.which(name) is not None,
+            "description": desc,
+        })
+    return result
+
+
 def start_worker():
     """启动后台处理线程（幂等）"""
     global _worker_thread
