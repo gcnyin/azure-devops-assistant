@@ -127,18 +127,18 @@ def diff_items(
         - continuing_items: 持续存在的（含状态变化标记）
         - disappeared_items: 消失的（上次有这次没有）
     """
-    current_ids = {it["id"] for it in current}
+    current_ids = {it["id"] for it in current if "id" in it}
     previous_ids = set(previous.keys())
 
     new_ids = current_ids - previous_ids
     gone_ids = previous_ids - current_ids
     keep_ids = current_ids & previous_ids
 
-    new_items = [it for it in current if it["id"] in new_ids]
+    new_items = [it for it in current if it.get("id") in new_ids]
 
     continuing_items = []
     for it in current:
-        if it["id"] in keep_ids:
+        if it.get("id") in keep_ids:
             prev_state = previous[it["id"]].get("state", "?")
             it_copy = dict(it)
             it_copy["_prev_state"] = prev_state

@@ -131,11 +131,27 @@ export function BoardView({ data, incompleteStates, stateColors, isError, error 
     setCheckedBugIds((prev) => { const next = new Set(prev); next.has(bugId) ? next.delete(bugId) : next.add(bugId); return next; });
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     const params = new URLSearchParams({ format: "csv", view: "all" });
     if (sprintParam) params.set("sprint", sprintParam);
-    const link = document.createElement("a"); link.href = `/api/export?${params}`; link.download = "";
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    try {
+      const token = localStorage.getItem("web_access_token");
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch(`/api/export?${params}`, { headers });
+      if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Export failed");
+    }
   }, [sprintParam]);
 
   const handleRefresh = useCallback(() => {

@@ -277,6 +277,25 @@ class TestApiFixesRetryRoute:
         assert data["ok"] is True
         assert data["task_id"] == 99
 
+    def test_retry_bug_includes_html_url(self, client, mocker):
+        """重试时 bug dict 应包含正确的 htmlUrl（回归：之前为空字符串）"""
+        from db import init_db, create_fix_task, update_fix_task_status, load_all_config
+        init_db()
+        # 确保 DB 中有 org/project 配置，否则 _build_bug_url 会 KeyError
+        tid = create_fix_task(601, "Bug With URL", sprint_name="Sprint 3")
+        update_fix_task_status(tid, "failed", error="crash", finished_at="now")
+
+        mock_enqueue = mocker.patch("web.enqueue_fix_tasks", return_value=[77])
+        resp = client.post(f"/api/fixes/{tid}/retry")
+        assert resp.status_code == 200
+
+        mock_enqueue.assert_called_once()
+        args, kwargs = mock_enqueue.call_args
+        bug = args[0][0]
+        assert bug["htmlUrl"] != ""
+        assert "dev.azure.com" in bug["htmlUrl"]
+        assert "/_workitems/edit/601" in bug["htmlUrl"]
+
     def test_retry_completed_task_returns_400(self, client):
         from db import init_db, create_fix_task, update_fix_task_status
         init_db()
@@ -1257,6 +1276,18 @@ class TestSortItems:
         # None state 不在 incomplete 中，排在完成组
         assert result[0]["state"] == "To Do"  # incomplete first
         assert len(result) == 3
+
+    def test_sort_id_zero_not_treated_as_missing(self):
+        """id=0 不应被 'or' 短路误判为缺失（回归测试：falsy 陷阱）"""
+        items = [
+            {"id": 0, "title": "zero-id"},
+            {"id": 1, "title": "one"},
+            {"id": 2, "title": "two"},
+        ]
+        result = _sort_items(items, "id-asc", [])
+        ids = [it["id"] for it in result]
+        # id=0 是合法值，应排在最前面而非末尾
+        assert ids == [0, 1, 2], f"Expected [0, 1, 2], got {ids}"
 
 
 class TestApplyRuntimeConfigSync:

@@ -28,6 +28,15 @@ from utils import get_logger, filter_items_by_user, make_incomplete_set, sort_by
 
 logger = get_logger(__name__)
 
+
+def _build_bug_url(bug_id: int) -> str:
+    """从 DB 配置构造 Azure DevOps Work Item URL。供 retry 等路径使用。"""
+    from urllib.parse import quote
+    cfg = load_all_config()
+    org = cfg["azure_devops_org"]
+    project = quote(cfg["azure_devops_project"], safe='')
+    return f"https://dev.azure.com/{org}/{project}/_workitems/edit/{bug_id}"
+
 # ponytail: was renderer.py — single dict, inlined to save a file
 def _sort_items(items: list[dict], sort_key: str, incomplete_states: list[str]) -> list[dict]:
     """Sort work items by the given sort key.
@@ -47,7 +56,7 @@ def _sort_items(items: list[dict], sort_key: str, incomplete_states: list[str]) 
     reverse = direction == "desc"
 
     key_map: dict[str, Any] = {
-        "id": lambda it: it.get("id") or (sys.maxsize if not reverse else -1),
+        "id": lambda it: it["id"] if it.get("id") is not None else (sys.maxsize if not reverse else -1),
         "title": lambda it: (it.get("title", "") or "").lower(),
         "type": lambda it: (it.get("type", "") or "").lower(),
         "state": lambda it: (it.get("state", "") or "").lower(),
@@ -607,7 +616,7 @@ def api_fixes_retry(task_id: int):
         "title": task["bug_title"],
         "type": task.get("work_item_type", "Bug"),
         "description": "",
-        "htmlUrl": "",
+        "htmlUrl": _build_bug_url(task["bug_id"]),
     }
     sprint_name = task.get("sprint_name", "")
 

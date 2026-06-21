@@ -243,16 +243,61 @@ def _build_branch_name(bug: dict) -> str:
 
 
 def _parse_result_block(output: str, marker: str) -> dict | None:
-    """从 AI agent 输出中解析 ---{marker}--- JSON 块"""
-    m = re.search(rf'---{re.escape(marker)}---\s*\n(.*?)(?:\n\s*```)?\s*$', output, re.DOTALL)
-    if not m:
-        m = re.search(rf'---{re.escape(marker)}---\s*\n?(\{{.*)', output, re.DOTALL)
-    if not m:
+    """从 AI agent 输出中解析 ---{marker}--- JSON 块
+
+    使用括号计数法提取平衡的 JSON 对象，比正则更健壮地处理嵌套、多行和
+    AI 输出中嵌入的注释文本。
+    """
+    marker_str = f'---{marker}---'
+    idx = output.find(marker_str)
+    if idx == -1:
         logger.warning("AI 输出中未找到 ---%s--- 标记", marker)
         return None
-    json_str = m.group(1).strip()
-    json_str = re.sub(r'^```(?:json)?\s*', '', json_str)
-    json_str = re.sub(r'\s*```$', '', json_str)
+
+    after = output[idx + len(marker_str):]
+
+    # 跳过可选带语言标注的 markdown 代码块开始标记
+    trimmed = re.sub(r'^\s*```(?:json)?\s*', '', after, count=1)
+
+    # 找到第一个 { 开始 JSON 对象
+    brace_idx = trimmed.find('{')
+    if brace_idx == -1:
+        logger.warning("AI 输出中未找到 ---%s--- 后的 JSON 块", marker)
+        return None
+
+    # 括号匹配提取完整 JSON（正确处理字符串内的 } 和转义引号）
+    depth = 0
+    in_string = False
+    escape = False
+    end_idx = -1
+    for i, ch in enumerate(trimmed[brace_idx:], brace_idx):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\':
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                end_idx = i + 1
+                break
+
+    if end_idx == -1:
+        logger.warning("%s JSON 块未闭合", marker)
+        return None
+
+    json_str = trimmed[brace_idx:end_idx].strip()
+    # 去掉可能的结尾 markdown 代码块结束标记
+    json_str = re.sub(r'\s*```\s*$', '', json_str)
+
     try:
         result = json.loads(json_str)
         logger.info("解析 %s 成功", marker)

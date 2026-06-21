@@ -333,3 +333,108 @@ class TestEnqueueFixTasks:
         assert "描述二" in prompts[1]
 
 
+# ── _parse_result_block 测试 ──
+
+class TestParseResultBlock:
+    """JSON 解析函数测试 — 验证括号计数解析器正确处理各种边界情况"""
+
+    def test_simple_valid_json(self):
+        """基本用法：标记后紧跟合法 JSON"""
+        from ai_fix import _parse_result_block
+        output = "some text\n---ANALYSIS---\n{\"target_repos\": [\"repo1\"], \"confidence\": \"high\"}"
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result == {"target_repos": ["repo1"], "confidence": "high"}
+
+    def test_json_with_nested_braces(self):
+        """JSON 内含嵌套 {}（如 JSON 字符串里的对象），括号计数正确"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---FIX_RESULT---\n'
+            '{"success": true, "repos": [{"path": "r", "commit_sha": "abc"}], "summary": "ok"}'
+        )
+        result = _parse_result_block(output, "FIX_RESULT")
+        assert result["success"] is True
+        assert len(result["repos"]) == 1
+        assert result["repos"][0]["path"] == "r"
+
+    def test_json_with_string_containing_brace(self):
+        """JSON 字符串值含 }{ 字符，解析器不被混淆"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---ANALYSIS---\n'
+            '{"target_repos": ["r"], "reasoning": "使用了 { 括号和 } 符号"}'
+        )
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result["target_repos"] == ["r"]
+        assert "括号" in result["reasoning"]
+
+    def test_json_with_escaped_quotes(self):
+        """JSON 字符串值含转义引号，解析器正确处理"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---ANALYSIS---\n'
+            '{"target_repos": ["repo"], "reasoning": "found \\"quoted\\" string"}'
+        )
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result["reasoning"] == 'found "quoted" string'
+
+    def test_marker_not_found_returns_none(self):
+        """标记不存在时返回 None"""
+        from ai_fix import _parse_result_block
+        result = _parse_result_block("no marker here", "ANALYSIS")
+        assert result is None
+
+    def test_no_json_after_marker_returns_none(self):
+        """标记后没有 JSON 块时返回 None"""
+        from ai_fix import _parse_result_block
+        result = _parse_result_block("---ANALYSIS---\nno json here", "ANALYSIS")
+        assert result is None
+
+    def test_unclosed_json_returns_none(self):
+        """JSON 块未闭合时返回 None"""
+        from ai_fix import _parse_result_block
+        result = _parse_result_block('---ANALYSIS---\n{"target_repos": ["r"]', "ANALYSIS")
+        assert result is None
+
+    def test_text_between_marker_and_json(self):
+        """标记和 JSON 之间有说明文字时仍能正确提取"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---ANALYSIS---\n'
+            'some explanation text\n'
+            '{"target_repos": ["r"], "confidence": "medium"}'
+        )
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result == {"target_repos": ["r"], "confidence": "medium"}
+
+    def test_markdown_code_fence_around_json(self):
+        """JSON 被 markdown 代码块包围时仍能解析"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---FIX_RESULT---\n'
+            '```json\n'
+            '{"success": true, "summary": "done", "repos": []}\n'
+            '```'
+        )
+        result = _parse_result_block(output, "FIX_RESULT")
+        assert result["success"] is True
+        assert result["summary"] == "done"
+
+    def test_invalid_json_returns_none(self):
+        """JSON 格式错误时返回 None"""
+        from ai_fix import _parse_result_block
+        output = '---ANALYSIS---\n{not valid json}'
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result is None
+
+    def test_multiple_json_objects_extracts_first(self):
+        """多 JSON 对象时提取第一个"""
+        from ai_fix import _parse_result_block
+        output = (
+            '---ANALYSIS---\n'
+            '{"target_repos": ["first"]}\n'
+            '{"target_repos": ["second"]}'
+        )
+        result = _parse_result_block(output, "ANALYSIS")
+        assert result == {"target_repos": ["first"]}
+

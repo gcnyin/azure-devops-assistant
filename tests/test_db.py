@@ -131,6 +131,21 @@ class TestDiffItems:
         assert continuing[0]["id"] == 1
         assert continuing[1]["id"] == 2
 
+    def test_items_without_id_key_are_skipped(self):
+        """缺少 'id' 键的 item 不应导致崩溃"""
+        from db import diff_items
+        current = [
+            _make_item(1),
+            {"title": "no-id-item", "state": "New", "type": "Bug"},
+            _make_item(2),
+        ]
+        previous = {1: _make_item(1), 2: _make_item(2)}
+        new_items, continuing, gone = diff_items(current, previous)
+        assert len(new_items) == 0
+        assert len(continuing) == 2
+        assert continuing[0]["id"] == 1
+        assert continuing[1]["id"] == 2
+
 
 class TestDbCRUD:
     """数据库 CRUD 操作测试（使用临时数据库文件）"""
